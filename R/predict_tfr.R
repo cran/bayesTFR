@@ -1,0 +1,627 @@
+tfr.predict <- function(mcmc.set=NULL, end.year=2100,
+						sim.dir=file.path(getwd(), 'bayesTFR.output'),
+						replace.output=FALSE,
+						nr.traj = NULL, thin = NULL, burnin=2000, use.diagnostics=FALSE,
+						save.as.ascii=1000, output.dir = NULL,
+						low.memory=TRUE,
+						# parameters for the AR1 stuff
+						mu=2.1, rho=0.9057, sigmaAR1=0.0922,
+						seed=NULL, verbose=TRUE) {
+	if(!is.null(mcmc.set)) {
+		if (class(mcmc.set) != 'bayesTFR.mcmc.set') {
+			stop('Wrong type of mcmc.set. Must be of type bayesTFR.mcmc.set.')
+			}
+	} else {		
+		mcmc.set <- get.tfr.mcmc(sim.dir, low.memory=low.memory, verbose=verbose)
+	}
+	if (is.null(rho) | is.null(sigmaAR1)) {
+		res <- get.ar1.parameters(mu = mu, mcmc.set$meta)
+		if (is.null(rho)) 
+			rho <- res$rho
+		if(is.null(sigmaAR1))
+			sigmaAR1 <- res$sigmaAR1
+	}
+	if(verbose)
+		cat('\nAR(1) parameters used: mu=', mu, ', rho=', rho, ', sigma=', sigmaAR1, '\n')
+	if(!is.null(seed)) set.seed(seed)
+	
+	# Get argument settings from existing convergence diagnostics
+	if(use.diagnostics) {
+		diag.list <- get.tfr.convergence.all(mcmc.set$meta$output.dir)
+		ldiag <- length(diag.list)
+		use.nr.traj <- rep(NA, ldiag)
+		use.burnin <- rep(NA, ldiag)
+		for(idiag in 1:length(diag.list)) {
+			if (has.mcmc.converged(diag.list[[idiag]])) {
+				use.nr.traj[idiag] <- diag$use.nr.traj
+				use.burnin[idiag] <- diag$burnin
+			}
+		}
+		if(all(is.na(use.nr.traj)))
+			stop('There is no diagnostics indicating convergence of the MCMCs. Use manual settings of "nr.traj" or "thin".')
+		# Try to select those that suggest nr.traj >= 2000 (take the minimum of those)
+		traj.is.notna <- !is.na(use.nr.traj)
+		larger2T <- traj.is.notna & use.nr.traj>=2000
+		nr.traj.idx <- if(sum(larger2T)>0) which.min(use.nr.traj[larger2T])
+						else which.max(use.nr.traj[traj.is.notna])
+		nr.traj <- use.nr.traj[nr.traj.idx]
+		burnin <- use.burnin[nr.traj.idx]
+		if(verbose)
+			cat('\nUsing convergence settings: nr.traj=', nr.traj, ', burnin=', burnin, '\n')
+	}
+	invisible(make.tfr.prediction(mcmc.set, end.year=end.year, replace.output=replace.output,  
+					nr.traj=nr.traj, burnin=burnin, thin=thin,
+					mu=mu, rho=rho,  sigmaAR1 = sigmaAR1,
+					save.as.ascii=save.as.ascii,
+					output.dir=output.dir, verbose=verbose))			
+}
+
+tfr.predict.extra <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'), 
+					prediction.dir=sim.dir, 
+					countries = NULL, save.as.ascii=1000, verbose=TRUE) {
+	# Run prediction for given countries/regions (as codes). If they are not given it will be set to countries 
+	# for which there are MCMC results but no prediction.
+	# It is to be used after running run.tfr.mcmc.extra
+	
+	mcmc.set <- get.tfr.mcmc(sim.dir)
+	if(is.null(mcmc.set))
+		stop('Error in "sim.dir" argument.')
+	pred <- get.tfr.prediction(sim.dir=prediction.dir)
+	if(is.null(pred))
+		stop('Error in "prediction.dir" argument.')
+	if(length(setdiff(pred$mcmc.set$meta$regions$country_code, mcmc.set$meta$regions$country_code)) > 0)
+		stop('Prediction is inconsistent with the mcmc results. Use tfr.predict.')
+	if(is.null(countries)) {
+		countries.idx <- (1:mcmc.set$meta$nr_countries)[!is.element(mcmc.set$meta$regions$country_code, 
+												pred$mcmc.set$meta$regions$country_code)]
+	} else {
+		countries.idx <- (1:mcmc.set$meta$nr_countries)[is.element(mcmc.set$meta$regions$country_code,
+												countries)]
+	}
+	if(length(countries.idx) == 0) {
+		cat('\nNothing to be done.\n')
+		return(invisible(pred))	
+	}
+	new.pred <- make.tfr.prediction(mcmc.set, end.year=pred$end.year, replace.output=FALSE,
+									nr.traj=pred$nr.traj, burnin=pred$burnin,
+									mu=pred$mu, rho=pred$rho, sigmaAR1=pred$sigmaAR1, 
+									countries=countries.idx, save.as.ascii=0, output.dir=prediction.dir,
+									write.summary.files=FALSE, verbose=verbose)
+									
+	# merge the two predictions
+	code.other.countries <- setdiff(pred$mcmc.set$meta$regions$country_code, 
+									mcmc.set$meta$regions$country_code[countries.idx])
+	idx.pred.others <- (1:pred$mcmc.set$meta$nr_countries)[is.element(pred$mcmc.set$meta$regions$country_code, 
+												code.other.countries)]
+	idx.other.countries <- (1:mcmc.set$meta$nr_countries)[is.element(mcmc.set$meta$regions$country_code,
+												code.other.countries)]
+												
+	prev.pred <- pred
+	pred$quantiles <- new.pred$quantiles
+	pred$quantiles[idx.other.countries,,] <- prev.pred$quantiles[idx.pred.others,,]
+	
+	pred$traj.mean.sd <- new.pred$traj.mean.sd
+	pred$traj.mean.sd[idx.other.countries,,] <- prev.pred$traj.mean.sd[idx.pred.others,,]
+	
+	pred$tfr_matrix_reconstructed <- new.pred$tfr_matrix_reconstructed
+	pred$tfr_matrix_reconstructed[,idx.other.countries] <- prev.pred$tfr_matrix_reconstructed[,idx.pred.others]
+	
+	pred$mcmc.set <- mcmc.set
+	
+	# save updated prediction, convert trajectories and create summary files
+	bayesTFR.prediction <- pred
+	prediction.file <- file.path(pred$output.dir, 'prediction.rda')
+	save(bayesTFR.prediction, file=prediction.file)
+	
+	do.convert.trajectories(tfr.pred=bayesTFR.prediction, n=save.as.ascii, output.dir=pred$output.dir, 
+							verbose=verbose)
+	do.write.projection.summary(tfr.pred=bayesTFR.prediction, output.dir=pred$output.dir)
+	
+	cat('\nPrediction stored into', pred$output.dir, '\n')
+	invisible(bayesTFR.prediction)
+}
+
+
+make.tfr.prediction <- function(mcmc.set, end.year=2100, replace.output=FALSE,
+								nr.traj = NULL, burnin=0, thin = NULL, 
+								mu=2.1, rho=0.9057, sigmaAR1 = 0.0922, countries = NULL,
+							    save.as.ascii=1000, output.dir = NULL, write.summary.files=TRUE, 
+							    verbose=verbose){
+	# if 'countries' is given, it is an index
+	# sigmaAR1 can be a vector. The last element will be repeated up to nr.projections
+
+	nr_project <- ceiling((end.year - mcmc.set$meta$present.year)/5)
+#	if (verbose)
+		cat('\nPrediction from', mcmc.set$meta$present.year, 
+			'(excl.) until', end.year, '(i.e.', nr_project, 'projections)\n\n')
+	l.sigmaAR1 <- length(sigmaAR1)
+	sigma.end <- rep(sigmaAR1[l.sigmaAR1], nr_project + mcmc.set$meta$T_end-l.sigmaAR1)
+	sigmas_all <- c(sigmaAR1, sigma.end) 
+	
+	sigma0_s <- a_sd_s <- b_sd_s <- f_sd_s <- const_sd_s <- NULL
+	total.iter <- get.total.iterations(mcmc.set$mcmc.list, burnin)
+	stored.iter <- get.stored.mcmc.length(mcmc.set$mcmc.list, burnin)
+	mcthin <- max(sapply(mcmc.set$mcmc.list, function(x) x$thin))
+	if(!is.null(nr.traj) && !is.null(thin)) {
+		warning('Both nr.traj and thin are given. Argument thin will be ignored.')
+		thin <- NULL
+	}
+	if(is.null(nr.traj)) nr.traj <- min(stored.iter, 2000)
+	if(is.null(thin)) thin <- floor(stored.iter/nr.traj * mcthin)
+	if(stored.iter <= 0 || thin == 0)
+		stop('The number of simulations is 0. Burnin might be larger than the number of simulated values, or # trajectories is too big.')
+	
+	#setup output directory
+	if (is.null(output.dir)) output.dir <- mcmc.set$meta$output.dir
+	outdir <- file.path(output.dir, 'predictions')
+	
+	if(is.null(countries)) {
+		if(!replace.output && has.tfr.prediction(mcmc.set))
+			stop('Prediction in ', outdir,
+			' already exists.\nSet replace.output=TRUE if you want to overwrite existing projections.')
+		unlink(outdir, recursive=TRUE)
+	}
+	if(!file.exists(outdir)) 
+		dir.create(outdir, recursive=TRUE)
+
+	thinned.mcmc <- get.thinned.tfr.mcmc(mcmc.set, thin=thin, burnin=burnin)
+	has.thinned.mcmc <- !is.null(thinned.mcmc) && thinned.mcmc$meta$parent.iter == total.iter
+	load.mcmc.set <- if(has.thinned.mcmc) thinned.mcmc
+					 else create.thinned.tfr.mcmc(mcmc.set, thin=thin, burnin=burnin, verbose=verbose)
+	nr_simu <- load.mcmc.set$mcmc.list[[1]]$finished.iter
+
+	if(load.mcmc.set$meta$nr_countries != mcmc.set$meta$nr_countries) {
+				# Probably there have been extra countries added to mcmc.set since the thinned set was created
+	
+	}
+	if (verbose) cat('Load variance parameters.\n')
+	var.par.names <- c('sigma0', 'a_sd', 'b_sd', 'S_sd', 'const_sd')
+	
+	var.par.values <- get.tfr.parameter.traces(load.mcmc.set$mcmc.list, 
+											var.par.names, burnin=0)
+											
+	prediction.countries <- if(is.null(countries)) 1:mcmc.set$meta$nr_countries else countries
+	nr_countries <- mcmc.set$meta$nr_countries
+	tfr_matrix_reconstructed <- get.tfr.reconstructed(mcmc.set$meta$tfr_matrix_observed, mcmc.set$meta)
+	ltfr_matrix <- dim(tfr_matrix_reconstructed)[1]
+	
+	#quantiles.to.keep <- c(0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975)
+	#keep these defaults for checking the out-of-sample projections
+    quantiles.to.keep <- c(0,0.025,0.05,0.1,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.75,0.8,0.9,0.95,0.975,1)
+	PIs_cqp <- array(NA, c(nr_countries, length(quantiles.to.keep), nr_project+1))
+	dimnames(PIs_cqp)[[2]] <- quantiles.to.keep
+	proj.middleyears <- seq(max(as.numeric(dimnames(tfr_matrix_reconstructed)[[1]])), by=5, length=nr_project+1)
+	dimnames(PIs_cqp)[[3]] <- proj.middleyears
+	mean_sd <- array(NA, c(nr_countries, 2, nr_project+1))
+	hasNAs <- rep(FALSE, nr_simu)
+	
+	if (verbose) cat('Load parameters mean_eps_tau and sd_eps_tau.\n')
+    tau.par.names <- c('mean_eps_tau', 'sd_eps_tau')
+    tau.par.values <- get.tfr.parameter.traces(load.mcmc.set$mcmc.list, tau.par.names, burnin=0)
+
+	if (verbose) cat('Load hierarchical parameters.\n')
+	alpha.vars <- paste('alpha_',1:3, sep='')
+	delta.vars <- paste('delta_',1:3, sep='')
+	other.vars <- c('chi', 'psi', 'Triangle4', 'delta4')
+	cs.par.values_hier <- get.tfr.parameter.traces(load.mcmc.set$mcmc.list, 
+										c(alpha.vars, delta.vars, other.vars), burnin=0)
+	
+	#########################################
+	for (country in prediction.countries){
+	#########################################
+		country.obj <- get.country.object(country, mcmc.set$meta, index=TRUE)
+		if (verbose) {			
+ 			cat('TFR projection for country', country, country.obj$name, 
+ 						'(code', country.obj$code, ')\n')
+ 		}
+		cs.par.values <- c()
+		if (is.element(country,mcmc.set$meta$id_DL)){
+			U.var <- paste('U_c', country.obj$code, sep='')
+			d.var <- paste('d_c', country.obj$code, sep='')
+			Triangle_c4.var <- paste("Triangle_c4_c", country.obj$code, sep = "")
+			gamma.vars <- paste('gamma_',1:3,'_c', country.obj$code, sep='')
+			if(country <= mcmc.set$meta$nr_countries_estimation) {
+				cs.par.values <- get.tfr.parameter.traces.cs(load.mcmc.set$mcmc.list, country.obj, 
+								tfr.parameter.names.cs(trans=FALSE), burnin=0)
+			} else {
+			# if it's country that was not included in the estimation, determine the posterior index
+			# again, since the MCMC might be of different length
+				if (is.element(country.obj$code, load.mcmc.set$meta$regions$country_code)) {
+					cs.par.values <- get.tfr.parameter.traces.cs(load.mcmc.set$mcmc.list, country.obj, 
+								tfr.parameter.names.cs(trans=FALSE), burnin=0)
+				} else { # there are no thinned traces for this country, use the full traces 
+					cs.par.values <- get.tfr.parameter.traces.cs(mcmc.set$mcmc.list, country.obj, 
+								tfr.parameter.names.cs(trans=FALSE), burnin=burnin)
+					selected.simu <- get.thinning.index(nr_simu, dim(cs.par.values)[1])
+					if (length(selected.simu$index) < nr_simu)
+						selected.simu$index <- sample(selected.simu$index, nr_simu, replace=TRUE)
+					cs.par.values <- cs.par.values[selected.simu$index,]
+				}
+			}
+			pc_si <- matrix(NA, nr_simu, 3)
+			for (i in 1:3){
+ 				pc_si[,i] <- exp(cs.par.values[,gamma.vars[i]])/
+ 								apply(exp(cs.par.values[,gamma.vars]), 1,sum)
+			}
+			theta_si <- cbind(
+				(cs.par.values[,U.var] - cs.par.values[, Triangle_c4.var])*pc_si[,1],
+				(cs.par.values[,U.var] - cs.par.values[, Triangle_c4.var])*pc_si[,2],
+				(cs.par.values[,U.var] - cs.par.values[, Triangle_c4.var])*pc_si[,3],
+				cs.par.values[, Triangle_c4.var], 
+				cs.par.values[,d.var]) 
+		} else { #Tistau countries
+                 # sample decline parameters from the hier distributions                 
+			Triangle4_tr_s = rnorm(1, mean = cs.par.values_hier[, 'Triangle4'], 
+									sd = cs.par.values_hier[, 'delta4'])
+			Triangle_c4_s <- ( mcmc.set$meta$Triangle_c4.up*exp(Triangle4_tr_s) + mcmc.set$meta$Triangle_c4.low)/(1+exp(Triangle4_tr_s))
+
+			# need U and Triangle_c4 in cs... later in loop for start of phase III and prior on f_t
+			cs.par.values = rep(mcmc.set$meta$tfr_matrix_observed[mcmc.set$meta$tau_c[country],country], nr_simu)
+			Triangle_c4.var = 'Triangle_c4'
+			U.var = 'U'
+			cs.par.values = cbind(cs.par.values, Triangle_c4_s)
+			colnames(cs.par.values) = c(U.var, Triangle_c4.var)
+
+			d_tr_s = rnorm(1, mean = cs.par.values_hier[, 'chi'], sd = cs.par.values_hier[, 'psi'])
+			d_s =  (mcmc.set$meta$d.up*(exp(d_tr_s) + mcmc.set$meta$d.low)/(1+exp(d_tr_s)))
+			#print(d_s) # check!
+
+			gamma_si = matrix(NA, nr_simu, 3)
+			for (i in 1:3){
+ 				gamma_si[,i] <- rnorm(1, mean = cs.par.values_hier[,alpha.vars[i]], 
+ 											sd = cs.par.values_hier[,delta.vars[i]])
+			}
+
+			pc_si = matrix(NA, nr_simu, 3)
+			for (i in 1:3) pc_si[,i] <- exp(gamma_si[,i])/apply(exp(gamma_si), 1,sum)
+			theta_si <- cbind(
+                                (cs.par.values[,U.var] - Triangle_c4_s)*pc_si[,1],
+                                (cs.par.values[,U.var] - Triangle_c4_s)*pc_si[,2],
+                                (cs.par.values[,U.var] - Triangle_c4_s)*pc_si[,3],
+                                Triangle_c4_s, d_s) 
+		}
+
+		missing <- is.na(tfr_matrix_reconstructed[,country])
+		nmissing <- sum(missing)
+		this.nr_project <- nr_project + nmissing
+		this.T_end <- mcmc.set$meta$T_end_c[country]
+		
+		#### projections might start before 1975 ...
+		dummie_c1975 = rep(0, this.nr_project)
+		# if this.T_end is before 1975, need to add const_sd to sd of distortion terms
+		if (sum(mcmc.set$meta$mcmc$const_sd_dummie_Tc[this.T_end:mcmc.set$meta$T_end,country]) !=0){
+ 			# gives number of add. periods with const
+ 			dummie_c1975[1:sum(mcmc.set$meta$mcmc$const_sd_dummie_Tc[this.T_end:mcmc.set$meta$T_end,country])] = 1
+		}
+                
+		nr_obs_in_phaseIII = (this.T_end - mcmc.set$meta$lambda_c[country])
+		sigma_t  = sigmas_all[(nr_obs_in_phaseIII+1):(nr_obs_in_phaseIII+this.nr_project)]
+		if (verbose & nmissing > 0) 
+			cat('\t', nmissing, 'data points reconstructed.\n')
+		# the projections
+		f_ps <- matrix(NA, this.nr_project+1,nr_simu)
+		# fs also includes last estimate!
+		f_ps[1,] <- tfr_matrix_reconstructed[this.T_end,country]
+		for (s in 1:nr_simu){
+  			year <- 2
+  			repl_stop <- ifelse( (mcmc.set$meta$lambda_c[country] != this.T_end) | 
+                                (
+                                (min(mcmc.set$meta$tfr_matrix_all[, country], na.rm=TRUE) <= cs.par.values[s, Triangle_c4.var]) & 
+                                (mcmc.set$meta$tfr_matrix_all[this.T_end, country] > mcmc.set$meta$tfr_matrix_all[this.T_end-1, country])
+                                ),
+                                TRUE, FALSE)
+                                
+			if (is.element(country, mcmc.set$id_Tistau)){
+				### need to start with sampling eps_tau!!
+       			 while(TRUE) {
+                 	eps_tmin1 <- rnorm(1, tau.par.values[s, 'mean_eps_tau'], tau.par.values[s, 'sd_eps_tau'])
+                    fps <- f_ps[year -1,s]- DLcurve(theta_si[s,], f_ps[year -1,s], 
+                                                        mcmc.set$meta$dl.p1, mcmc.set$meta$dl.p2)+ eps_tmin1
+                    if( fps > 0 & fps <= cs.par.values[s,U.var] ) break
+                 }
+        		f_ps[year,s] <- fps
+        		year = year +1 # no repl stop possible if decline has just started!
+			}
+
+ 			while (!repl_stop & year <(this.nr_project+2)){ 
+ 				# year goes upto nr_project+1
+  				# sample the distortion
+  				sigma_eps <- var.par.values[s,'sigma0'] + 
+  					(f_ps[year -1,s] - var.par.values[s,'S_sd'])*
+  						ifelse(f_ps[year -1,s] > var.par.values[s,'S_sd'], 
+  						-var.par.values[s,'a_sd'], var.par.values[s,'b_sd'])
+  				sigma_eps <- max(sigma_eps, mcmc.set$meta$sigma0.min)
+  				while(TRUE) {
+  					eps_tmin1 <- rnorm(1, 0, sigma_eps)
+  					fps <- f_ps[year -1,s]- DLcurve(theta_si[s,], f_ps[year -1,s], 
+  								mcmc.set$meta$dl.p1, mcmc.set$meta$dl.p2)+ eps_tmin1
+  					if( fps > 0 & fps <= cs.par.values[s,U.var] ) break
+  				}
+  				f_ps[year,s] <- fps
+  				if ((min(f_ps[1:year, s]) <= cs.par.values[s, Triangle_c4.var]) & 
+                                                           (f_ps[year, s] > f_ps[year-1, s]))
+                	repl_stop <- TRUE 
+  				year = year +1
+ 			} # end while loop, continue if repl_stop ==TRUE and year<nr_project+2
+ 			
+ 			if (repl_stop & year <(this.nr_project+2)){
+ 				# use sigma_t
+                index_sigma <- 0
+ 				for (period in year:(this.nr_project+1)){
+ 					index_sigma <- index_sigma + 1
+					f_ps[period,s] <- mu + rho*
+								(f_ps[period-1,s] - mu) + 
+								rnorm(1, 0, sigma_t[index_sigma])
+				}
+ 			}# end AR(1) loop
+		} # end simu loop
+		isnotNA <- apply(1-(f_ps<0), 2, prod) 
+		isnotNA <- ifelse(is.na(isnotNA),0,isnotNA)
+		f_ps[,isnotNA==0] <- NA
+		if (nmissing > 0) {
+			f_ps_future <- f_ps[(nmissing+1):nrow(f_ps),]
+			f_ps_future[1,] <- quantile(f_ps_future[1,], 0.5, na.rm = TRUE)
+			tfr_matrix_reconstructed[(this.T_end+1):ltfr_matrix,country] <- apply(matrix(f_ps[2:(nmissing+1),], nrow=nmissing), 
+												1, quantile, 0.5, na.rm = TRUE)
+		} else {
+			f_ps_future <- f_ps
+		}
+		this.hasNAs <- apply(is.na(f_ps_future), 2, any)
+		hasNAs[this.hasNAs] <- TRUE
+		trajectories <- f_ps_future # save only trajectories simulated for the future time
+  		save(trajectories, file = file.path(outdir, paste('traj_country', country.obj$code, '.rda', sep='')))
+ 		
+ 		PIs_cqp[country,,] = apply(f_ps_future, 1, quantile, quantiles.to.keep, na.rm = TRUE)
+ 		mean_sd[country,1,] <- apply(f_ps_future, 1, mean, na.rm = TRUE)
+ 		mean_sd[country,2,] = apply(f_ps_future, 1, sd, na.rm = TRUE)
+ 		
+	} # end countries loop
+	
+	##############
+	
+	mcmc.set <- remove.tfr.traces(mcmc.set)
+	bayesTFR.prediction <- structure(list(
+				quantiles = PIs_cqp,
+				traj.mean.sd = mean_sd,
+				nr.traj=nr_simu,
+				tfr_matrix_reconstructed = tfr_matrix_reconstructed,
+				output.directory=outdir,
+				na.index=(1:nr_simu)[hasNAs],
+				mcmc.set=load.mcmc.set,
+				nr.projections=nr_project,
+				burnin=burnin,
+				end.year=end.year,
+				mu=mu, rho=rho,  sigma_t = sigma_t, sigmaAR1 = sigmaAR1),
+				class='bayesTFR.prediction')
+				
+	prediction.file <- file.path(outdir, 'prediction.rda')
+	save(bayesTFR.prediction, file=prediction.file)
+	
+	do.convert.trajectories(tfr.pred=bayesTFR.prediction, n=save.as.ascii, output.dir=outdir, verbose=verbose)
+	if(write.summary.files)
+		do.write.projection.summary(tfr.pred=bayesTFR.prediction, output.dir=outdir)
+	
+	cat('\nPrediction stored into', outdir, '\n')
+	invisible(bayesTFR.prediction)
+}
+
+get.ar1.parameters <- function(mu = 2.1, meta){  
+	tfr_prev <- tfr_now <- NULL
+    for (country in seq(1, meta$nr_countries)[meta$lambda_c!=meta$T_end_c]){  
+		tfr = meta$tfr_matrix_all[,country]
+		tfr_prev = c(tfr_prev, c(meta$tfr_matrix_all[meta$lambda_c[country]:(meta$T_end_c[country]-1),country] ))
+		tfr_now = c(tfr_now, c(meta$tfr_matrix_all[(meta$lambda_c[country]+1):meta$T_end_c[country],country] ))
+	}
+	yt <- tfr_now - mu
+	ytm1 <- tfr_prev - mu
+	mod = lm(yt~-1 +ytm1)
+	rho = mod$coeff[1]
+	sigmaAR1 = sqrt(sum(mod$residuals^2)/(length(tfr_now)-1))
+	tfr = ifelse(meta$tfr_matrix_all<=mu,meta$tfr_matrix_all, NA)
+	sd_tot = sd(c(tfr, 2*mu-tfr), na.rm = TRUE)
+	#sigma.end = sd_tot*sqrt(1-rho^2)
+	return(list(rho = round(rho,2), sigmaAR1 = round(sigmaAR1,2)
+				))
+}
+
+
+remove.tfr.traces <- function(mcmc.set) {
+	for (i in 1:length(mcmc.set$mcmc.list)) {
+		mcmc.set$mcmc.list[[i]]$traces <- 0
+		mcmc.set$mcmc.list[[i]]$burnin <- 0
+	}
+	invisible(mcmc.set)
+}
+
+store.traj.ascii <- function(trajectories, n, output.dir, country.code, meta, index, append=FALSE) {
+	# Store trajectories into ASCII files of a specific UN format 
+	header <- list(country_code='LocID', period='Period', year='Year', trajectory='Trajectory', tfr='TF')
+	nyears <- dim(trajectories)[1]
+	pred.years <- get.prediction.years(meta, nyears)
+	pred.period <- get.prediction.periods(meta, nyears)
+	results <- NULL
+	for (traj in 1:length(index)) {
+		results <- rbind(results, cbind(country_code=rep(country.code, nyears), 
+								period=pred.period, year=pred.years, 
+								trajectory=rep(index[traj], nyears), 
+								tfr=round(trajectories[,index[traj]], 5)))
+	}
+	#match column names and header
+	colnames(results)[colnames(results)==names(header)] <- header
+	write.table(results, file=file.path(output.dir, 'ascii_trajectories.csv'), sep=',', 
+					quote=FALSE, row.names=FALSE, col.names=!append, append=append)
+	return(results)
+}
+
+get.prediction.years <- function(meta, n) {
+	present.year <- as.numeric(rownames(meta$tfr_matrix)[nrow(meta$tfr_matrix)])
+	return (seq(present.year, length=n, by=5))
+}
+
+get.prediction.periods <- function(meta, n) {
+	mid.years <- get.prediction.years(meta, n)
+	return (paste(mid.years-3, mid.years+2, sep='-'))
+}
+
+do.convert.trajectories <- function(tfr.pred, n, output.dir, verbose=FALSE) {
+	# Converts all trajectory rda files into UN ascii, selecting n trajectories by equal spacing.
+	if(n==0) return(NULL)
+	nr.simu <- tfr.pred$nr.traj
+	has.na <- rep(FALSE, nr.simu)
+	has.na[tfr.pred$na.index] <- TRUE
+	if (n=='all') n <- nr.simu
+	selected.traj <- get.thinning.index(n, nr.simu)
+	is.selected <- rep(FALSE, nr.simu)
+	is.selected[selected.traj$index] <- TRUE
+	is.sel.has.na <- is.selected & has.na
+	for(NAidx in (1:nr.simu)[is.sel.has.na]) { #for selected NA-spots, find the closest neighbours that are not NA
+		is.selected[NAidx] <- FALSE
+		if(n==nr.simu) next
+		i <- NAidx-1
+		dist <- 1
+		while(TRUE) {
+			if(i>0) {
+				if (!is.selected[i] & !has.na[i]) { # looking at lower index
+					is.selected[i] <- TRUE
+					break
+					}
+				}
+			i <- NAidx + dist
+			if (i > nr.simu) break 
+			if (is.selected[i]) break
+			if (!has.na[i]) { # looking at higher index
+				is.selected[i] <- TRUE
+				break
+			}
+			dist <- dist + 1
+			i <- NAidx - dist
+		}
+	}
+	index <- (1:nr.simu)[is.selected]
+	country.codes <- country.names <- c()
+	result.wide <- c()
+	for (country in 1:tfr.pred$mcmc.set$meta$nr_countries) {
+		country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta, index=TRUE)
+		if(verbose) cat('Converting trajectories for', country.obj$name, '(code', country.obj$code, ')\n')
+		trajectories <- get.trajectories(tfr.pred, country.obj$code)$trajectories
+		if (is.null(trajectories)) {
+			warning('No trajectories for ', country.obj$name, ' (code ', country.obj$code, ')')
+		} else {
+			country.codes <- c(country.codes, country.obj$code)
+			country.names <- c(country.names, country.obj$name)
+			append <- country > 1
+			result <- store.traj.ascii(trajectories, n, output.dir, country.obj$code, 
+							tfr.pred$mcmc.set$meta, index=index, append=append)
+			if(!append) {
+				result.wide <- result[,2:5]
+			} else {
+				result.wide <- cbind(result.wide, result[,'TF'])
+			}
+		}
+	}
+	# order result.wide by country name
+	o <- order(country.names)
+	result.wide[,4:ncol(result.wide)] <- result.wide[,3+o]
+	# write transposed version
+	file.wide <- file.path(output.dir, 'ascii_trajectories_wide.csv')
+	colnames(result.wide) <- c('Period', 'Year', 'Trajectory', country.names[o])
+	write.table(rbind(c(' ', ' ', 'LocID', country.codes[o]), colnames(result.wide)), 
+					file=file.wide, sep=',', 
+					quote=TRUE, row.names=FALSE, col.names=FALSE)
+	write.table(result.wide, file=file.wide, sep=',', 
+					quote=FALSE, row.names=FALSE, col.names=FALSE, append=TRUE)
+
+	if(verbose) cat('Number of trajectories stored for each country:', length(index), '\n')
+	cat('Converted trajectories stored into', file.path(output.dir, 'ascii_trajectories(_wide).csv'), '\n')
+}
+
+
+convert.tfr.trajectories <- function(dir=file.path(getwd(), 'bayesTFR.output'), 
+								 n=1000, output.dir=NULL, 
+								 verbose=FALSE) {
+	# Converts all trajectory rda files into UN ascii, selecting n trajectories by equal spacing.
+	if(n <= 0) return()
+	pred <- get.tfr.prediction(sim.dir=dir)
+	if (is.null(output.dir)) output.dir <- pred$output.directory
+	if(!file.exists(output.dir)) dir.create(output.dir, recursive=TRUE)
+	cat('Converting trajectories from', dir, '\n')
+	if (is.null(pred$na.index)) {
+		if(verbose) cat('Finding NA values in each country ...\n')
+		for (country in 1:pred$mcmc.set$meta$nr_countries) {
+			country.obj <- get.country.object(country, pred$mcmc.set$meta, index=TRUE)
+			trajectories <- get.trajectories(pred, country.obj$code)$trajectories
+			if (country==1) hasNAs <- rep(FALSE, dim(trajectories)[2])
+			this.hasNAs <- apply(is.na(trajectories), 2, any)
+			hasNAs[this.hasNAs] <- TRUE
+		}
+		pred$na.index <- (1:pred$nr.traj)[hasNAs]
+	}
+	do.convert.trajectories(tfr.pred=pred, n=n, output.dir=output.dir, verbose=verbose)
+}
+
+write.projection.summary <- function(dir=file.path(getwd(), 'bayesTFR.output'), 
+									 output.dir=NULL, revision=14) {
+# Writes two prediction summary files, one in a user-friendly format, one in a UN-format.
+	pred <- get.tfr.prediction(sim.dir=dir)
+	if (is.null(output.dir)) output.dir <- pred$output.directory
+	if(!file.exists(output.dir)) dir.create(output.dir, recursive=TRUE)
+	do.write.projection.summary(pred, output.dir, revision=revision)
+}
+
+do.write.projection.summary <- function(tfr.pred, output.dir, revision=14) {
+	cat('Creating summary files ...\n')
+	data(UN_time)
+	data(UN_variants)
+	nr.proj <- tfr.pred$nr.projections+1
+	pred.period <- get.prediction.periods(tfr.pred$mcmc.set$meta, nr.proj)
+	header1 <- list(country.name='country_name',  country.code='country_code', variant='variant')
+	un.time.idx <- c()
+	un.time.label <- as.character(UN_time[,'TLabel'])
+	l.un.time.label <- length(un.time.label)
+	for (i in 1:nr.proj) {
+		header1[[paste('year', i, sep='')]] <- pred.period[i]
+		un.time.idx <- c(un.time.idx, (1:l.un.time.label)[un.time.label==pred.period[i]])
+	}
+	header2 <- list(revision='RevID', variant='VarID', country='LocID', year='TimeID', tfr='TFR')
+	nr.var <- 8 # median, upper and lower of 80 and 95%, upper and lower of +-0.5 child, constant
+	UN.variant.names <- c('BHM median', 'BHM80 lower',  'BHM80 upper', 'BHM95 lower',  'BHM95 upper', 'LR Low', 'LR High', 'LR constant fertility')
+	result1 <- result2 <- NULL
+	for (country in 1:tfr.pred$mcmc.set$meta$nr_countries) {
+		country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta, index=TRUE)
+		this.result1 <- cbind(
+				country.name=rep(country.obj$name, nr.var), 
+				country.code=rep(country.obj$code, nr.var),
+				variant=c('median', 'lower 80', 'upper 80', 'lower 95', 'upper 95', '-0.5child', '+0.5child', 'constant'))
+		median <- get.median.from.prediction(tfr.pred, country.obj$index)
+		proj.result <- round(rbind(median, 
+							   get.traj.quantiles(tfr.pred, country.obj$index, pi=80),
+							   get.traj.quantiles(tfr.pred, country.obj$index, pi=95),
+							   get.half.child.variant(median),
+							   rep(median[1], nr.proj)), 2)
+		colnames(proj.result) <- grep('year', names(header1), value=TRUE)
+		this.result1 <- cbind(this.result1, proj.result)
+		result1 <- rbind(result1, this.result1)
+		for(ivar in 1:nr.var) {
+			result2 <- rbind(result2, cbind(revision=rep(revision, nr.proj), 
+								   variant=rep(UN_variants[UN_variants[,'Vshort']==UN.variant.names[ivar],'VarID'], nr.proj),
+								   country=rep(country.obj$code, nr.proj),
+								   year=UN_time[un.time.idx,'TimeID'],
+								   tfr=proj.result[ivar,]))
+		}
+	}
+	colnames(result1)[colnames(result1)==names(header1)] <- header1
+	colnames(result2)[colnames(result2)==names(header2)] <- header2
+	write.table(result1, file=file.path(output.dir, 'projection_summary_user_friendly.csv'), sep=',', 
+					row.names=FALSE, col.names=TRUE)
+	write.table(result2, file=file.path(output.dir, 'projection_summary.csv'), sep=',', 
+					quote=FALSE, row.names=FALSE, col.names=TRUE)
+	cat('Projection summaries stored into: \n', 
+			file.path('\t\t', output.dir, 'projection_summary_user_friendly.csv'), '\n',
+			file.path('\t\t', output.dir, 'projection_summary.csv'), '\n')
+}
+
+get.tfr.reconstructed <- function(tfr, meta) {
+	tfr_matrix_reconstructed <- tfr
+	if(is.null(tfr_matrix_reconstructed)) tfr_matrix_reconstructed <- meta$tfr_matrix_all
+	return(tfr_matrix_reconstructed)
+}

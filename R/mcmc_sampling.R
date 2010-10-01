@@ -1,0 +1,286 @@
+
+#########################################################
+# MCMC sampling for DLpar for UN estimates
+#########################################################
+
+tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE) {
+
+	if (!is.null(mcmc$rng.state)) .Random.seed <- mcmc$rng.state
+    nr_simu <- mcmc$iter
+    nr_countries <- mcmc$meta$nr_countries_estimation
+    nr_countries_all <- mcmc$meta$nr_countries
+    has_extra_countries <- nr_countries != nr_countries_all
+    Triangle_c4.low <- mcmc$meta$Triangle_c4.low
+    Triangle_c4.up <- mcmc$meta$Triangle_c4.up
+    lower_d <- mcmc$meta$d.low
+    upper_d <- mcmc$meta$d.up
+
+    id_DL <- mcmc$meta$id_DL[mcmc$meta$id_DL <= nr_countries]
+    id_DL_all <- mcmc$meta$id_DL
+    id_early <- mcmc$meta$id_early[mcmc$meta$id_early <= nr_countries]
+    id_early_all <- mcmc$meta$id_early
+    id_notearly <- mcmc$meta$id_notearly[mcmc$meta$id_notearly <= nr_countries]
+    id_notearly_all <- mcmc$meta$id_notearly
+    nr_notearly <- length(id_notearly)
+    nr_DL <- length(id_DL)
+    sqrt.nr.dl.plus1 <- sqrt(nr_DL + 1)
+    CoverCplus1 <- nr_DL/(nr_DL+1)
+
+    chi0 <- mcmc$meta$chi0
+    psi0 <- mcmc$meta$psi0
+    nu_psi0 <- mcmc$meta$nu.psi0
+    nu_psiD <- nu_psi0 + nr_DL
+    prod_psi0 <- nu_psi0*psi0^2
+
+    mean_eps_tau_0 <- mcmc$meta$mean.eps.tau0
+    sd_eps_tau_0 <- mcmc$meta$sd.eps.tau0
+    nu_tau0 <- mcmc$meta$nu.tau0
+    nu_tauD <- nu_tau0 + nr_notearly
+    prod_tau0 <- nu_tau0*sd_eps_tau_0^2
+
+    delta4_0 <- mcmc$meta$delta4.0
+    Triangle4_0  <- mcmc$meta$Triangle4.0
+    nu4_D <- mcmc$meta$nu4 +  nr_DL
+    prod_delta4_0 <- mcmc$meta$nu4*delta4_0^2
+    
+    nu_deltaD <- mcmc$meta$nu.delta0 +  nr_DL
+    a_delta <- nu_deltaD/2
+    prod_delta0 <- mcmc$meta$nu.delta0*mcmc$meta$delta0^2 
+    
+    mcmc$thin <- thin
+    ones <- matrix(1, ncol=nr_DL, nrow=3)
+
+	if(is.null(mcmc$eps_Tc)) mcmc$eps_Tc <- get_eps_T_all(mcmc)
+	
+	if(has_extra_countries) {
+		if (verbose)
+			cat('\nCountries', mcmc$meta$regions$country_code[(nr_countries+1):nr_countries_all], 
+							'not included in the estimation.\n')
+	}
+
+  	# sd_Tc with sigma0 and sd_tau_eps
+    # the non-constant variance is sum of sigma0 and add_to_sd_Tc
+    # matrix with each column one country
+    mcmc$add_to_sd_Tc <- matrix(NA, mcmc$meta$T_end-1, nr_countries_all)
+    for (country in 1:nr_countries_all){
+    	# could exclude 1:(tau_c-1) here
+        mcmc$add_to_sd_Tc[,country] <-  
+                      (mcmc$meta$tfr_matrix[-mcmc$meta$T_end_c[country],country] - mcmc$S_sd)*
+                       ifelse(mcmc$meta$tfr_matrix[-mcmc$meta$T_end_c[country],country] > mcmc$S_sd, 
+                                                -mcmc$a_sd, mcmc$b_sd)
+	}
+	
+  	mcmc$mean_eps_Tc = matrix(0, mcmc$meta$T_end -1, nr_countries_all)
+    idx.tau_c.id.notearly.all <- matrix(c(mcmc$meta$tau_c[id_notearly_all], id_notearly_all), ncol=2)
+	mcmc$mean_eps_Tc[idx.tau_c.id.notearly.all] <- mcmc$mean_eps_tau
+	
+	idx.tau_c.id.notearly <- matrix(c(mcmc$meta$tau_c[id_notearly], id_notearly), ncol=2)
+    ################################################################### 
+    # Start MCMC
+	############
+    for (simu in start.iter:nr_simu) {
+    	if(verbose || (simu %% 10 == 0))
+        	cat('\nIteration:', simu, '--', date())
+
+        #################################################################
+        ## a_sd, b_sd, f_sd and sigma0
+        #################################################################
+        # updates sd_Tc
+        # start with this to get the right sd_Tc in the next steps!!
+        mcmc <- mcmc.update.abSsigma0const(mcmc, idx.tau_c.id.notearly)
+
+       #################################################################### 
+        # 2. mean_eps_tau sd_eps_tau: gibbs step
+        ##################################################################
+
+        eps_taus <- mcmc$eps_Tc[idx.tau_c.id.notearly] # only for estimation countries
+        mcmc$mean_eps_tau <- rnorm(1, mean = (sum(eps_taus)/(mcmc$sd_eps_tau^2) +
+                        mean_eps_tau_0/(sd_eps_tau_0^2))/
+                        (1/sd_eps_tau_0^2 + nr_notearly/(mcmc$sd_eps_tau^2)),
+                             sd = 1/sqrt(1/sd_eps_tau_0^2 + nr_notearly/(mcmc$sd_eps_tau^2)) )
+        sum_dt2 = sum(  (eps_taus - mcmc$mean_eps_tau)^2)
+        mcmc$sd_eps_tau <- sqrt(1/rgamma(1,nu_tauD/2, rate = 1/2*(prod_tau0 + sum_dt2)))
+
+ 		#update all not-early countries
+		mcmc$sd_Tc[idx.tau_c.id.notearly.all] <- mcmc$sd_eps_tau
+		mcmc$mean_eps_Tc[idx.tau_c.id.notearly.all] <- mcmc$mean_eps_tau
+        #################################################################### 
+        # 2. chi's and psi's: gibbs step
+        ##################################################################
+        # this is phi_c, the logit transformed d_c's
+        d_transformed_declinecountries <- 
+                        log((mcmc$d_c[id_DL] - lower_d)/(
+                                upper_d-mcmc$d_c[id_DL])) 
+        mcmc$chi <- rnorm(1, mean = (sum(d_transformed_declinecountries)/(mcmc$psi^2) +chi0/(psi0^2))/(1/psi0^2 + nr_DL/(mcmc$psi^2)),
+                             sd = 1/sqrt(1/psi0^2 + nr_DL/(mcmc$psi^2)))
+        sum_dt2 = sum(  (d_transformed_declinecountries - mcmc$chi)^2)
+        mcmc$psi <- sqrt(1/rgamma(1,nu_psiD/2, rate = 1/2*(prod_psi0 + sum_dt2)))
+
+        #################################################################### 
+        # 2. Triangle4 and delta4_star: gibbs step
+        ##################################################################
+        # logit transformed Triangle_c4's
+        delta4.squared <- mcmc$delta4^2
+        delta4.0.squared <- delta4_0^2
+        Triangle_c4_transformed <- 
+                        log((mcmc$Triangle_c4[id_DL] - Triangle_c4.low)/
+                                        (Triangle_c4.up-mcmc$Triangle_c4[id_DL])) 
+        mcmc$Triangle4 <- rnorm(1, mean = (sum(Triangle_c4_transformed)/(delta4.squared) + 
+        										Triangle4_0/delta4.0.squared)/
+                                                  (1/delta4.0.squared + nr_DL/(delta4.squared)),
+                             sd = 1/sqrt(1/delta4.0.squared + nr_DL/delta4.squared))
+
+        sum_dt2 = sum(  (Triangle_c4_transformed - mcmc$Triangle4)^2)
+        mcmc$delta4 <- sqrt(1/rgamma(1,nu4_D/2, rate = 1/2*(prod_delta4_0 + sum_dt2)))
+
+        #################################################################### 
+        # country-specific parameters: d_c, gamma's, U_c and Triangle_c4
+        ##################################################################
+        
+        for (country in id_DL_all){
+                mcmc <- mcmc.update.d(country, mcmc)
+                mcmc <- mcmc.update.gamma(country, mcmc)
+                mcmc <- mcmc.update.Triangle_c4(country, mcmc)
+        } 
+ 
+         # U_c updated only for countries with early decline
+         for (country in id_early_all){
+                mcmc <- mcmc.update.U(country, mcmc)
+         } 
+
+         ##################################################################
+         ## alpha_i's and delta_i's, with gibbs step
+         ##################################################################
+
+         mcmc$alpha <- rnorm(3, mean = (apply(mcmc$gamma_ci[id_DL,], 2, sum)/(mcmc$delta^2) + 
+         										mcmc$meta$alpha0.p/(mcmc$meta$delta0^2))/
+                                                        (1/(mcmc$meta$delta0^2) + nr_DL/(mcmc$delta^2)),
+                                sd = 1/sqrt(1/(mcmc$meta$delta0^2) + nr_DL/(mcmc$delta^2)))
+
+         sum_gammas <- apply( (mcmc$gamma_ci[id_DL,] - t(ones*mcmc$alpha) )^2, 2, sum)
+         mcmc$delta <- sqrt(1/rgamma(3,a_delta , rate = 1/2*(prod_delta0 + sum_gammas) ) )
+
+         ################################################################### 
+         # write samples simu/thin to disk
+         ##################################################################
+         mcmc$finished.iter <- simu
+         mcmc$rng.state <- .Random.seed
+         if (simu %% thin == 0){
+         	mcmc$length <- mcmc$length + 1
+         	flush.buffer <- FALSE
+            if (simu + 1 > nr_simu) flush.buffer <- TRUE
+            store.mcmc(mcmc, append=TRUE, flush.buffer=flush.buffer, verbose=verbose)
+         }
+	}       # end simu loop MCMC
+    return(mcmc)
+}
+
+tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample,
+											 iter=NULL, burnin=2000, verbose=FALSE) {
+	#run mcmc sampling for countries given by the index 'countries'
+	nr_simu <- iter
+	if (is.null(iter))
+    	nr_simu <- mcmc$length
+   	nr_countries.not.update <- mcmc$meta$nr_countries - length(countries)
+    nr_countries_all <- mcmc$meta$nr_countries
+    nr_countries <- length(countries)
+    Triangle_c4.low <- mcmc$meta$Triangle_c4.low
+    Triangle_c4.up <- mcmc$meta$Triangle_c4.up
+    lower_d <- mcmc$meta$d.low
+    upper_d <- mcmc$meta$d.up
+
+    id_DL <- mcmc$meta$id_DL[is.element(mcmc$meta$id_DL, countries)]
+    id_early <- mcmc$meta$id_early[is.element(mcmc$meta$id_early, countries)]
+    id_notearly <- mcmc$meta$id_notearly[is.element(mcmc$meta$id_notearly, countries)]
+	    
+	const_sd_dummie_Tc_extra <- matrix(0, mcmc$meta$T_end-1, nr_countries)
+	const_sd_dummie_Tc_extra[1:5,] <- 1
+	
+	# get values of the hyperparameters (sample from the posterior)
+    hyperparameter.names <- tfr.parameter.names(trans=FALSE)
+    hyperparameters <- list()
+    sampled.index <- sample(posterior.sample, nr_simu, replace=TRUE)
+    for (par in hyperparameter.names) {
+    	hyperparameters[[par]] <- c()
+    	for(mc in mcmc.list) {
+    		if (no.traces.loaded(mc)  || burnin < mc$traces.burnin) {
+    			traces <- do.get.traces(mc, par, burnin=burnin)
+        	} else {
+          		traces <- get.burned.tfr.traces(mc, par, burnin)
+       		}
+       		hyperparameters[[par]] <- rbind(hyperparameters[[par]], traces)
+       	}
+    	hyperparameters[[par]] <- hyperparameters[[par]][sampled.index,]
+    }
+	mcmc.orig <- mcmc
+	updated.var.names <- c('gamma_ci', 'd_c', 'Triangle_c4', 'U_c')
+	idx.tau_c.id.notearly <- matrix(c(mcmc$meta$tau_c[id_notearly], id_notearly), ncol=2)
+    ################################################################### 
+    # Start MCMC
+	############
+    for (simu in 1:nr_simu) {
+        if(verbose || (simu %% 10 == 0))
+			cat('\nIteration:', simu, '--', date())
+        # set hyperparameters for this iteration
+        for (par in hyperparameter.names) {
+        	if(is.null(dim(hyperparameters[[par]]))) {
+        		mcmc[[par]] <- hyperparameters[[par]][simu]
+        	} else {
+        		mcmc[[par]] <- hyperparameters[[par]][simu,]
+        	}
+        }
+        # compute eps_T, mean_eps_t and sd_Tc
+        if(is.null(mcmc$eps_Tc)) mcmc$eps_Tc <- get_eps_T_all(mcmc)
+         	
+        add_to_sd_Tc_extra <- matrix(NA, mcmc$meta$T_end-1, nr_countries)
+    	for (icountry in 1:length(countries)){
+    		country <- countries[icountry]
+			add_to_sd_Tc_extra[,icountry] <-  
+                      (mcmc$meta$tfr_matrix[-mcmc$meta$T_end_c[country],country] - mcmc$S_sd)*
+                       ifelse(mcmc$meta$tfr_matrix[-mcmc$meta$T_end_c[country],country] > mcmc$S_sd, 
+                                                -mcmc$a_sd, mcmc$b_sd)
+		}
+		mcmc$mean_eps_Tc <- matrix(0, mcmc$meta$T_end -1, nr_countries_all)
+        mcmc$sd_Tc <- matrix(NA, mcmc$meta$T_end -1, nr_countries_all)
+       	mcmc$sd_Tc[,countries] <- ifelse(const_sd_dummie_Tc_extra==1, 
+         						mcmc$const_sd, 1)*
+            			   ifelse((mcmc$sigma0 + add_to_sd_Tc_extra)>0, mcmc$sigma0 + add_to_sd_Tc_extra, 
+            						mcmc$meta$sigma0.min)
+         	
+ 		mcmc$sd_Tc[idx.tau_c.id.notearly] <- mcmc$sd_eps_tau
+ 		mcmc$mean_eps_Tc[idx.tau_c.id.notearly] <- mcmc$mean_eps_tau
+        #################################################################### 
+        # country-specific parameters: d_c, gamma's, U_c and Triangle_c4
+        ##################################################################
+        for (country in id_DL) {
+        	mcmc <- mcmc.update.d(country, mcmc)
+            mcmc <- mcmc.update.gamma(country, mcmc)
+            mcmc <- mcmc.update.Triangle_c4(country, mcmc)
+        } 
+ 
+         # U_c updated only for countries with early decline
+         for (country in id_early){
+                mcmc <- mcmc.update.U(country, mcmc)
+         } 
+
+         ################################################################### 
+         # write samples to disk
+         ##################################################################
+         #update the original mcmc with the new values
+         for(var in updated.var.names) {
+         	mcmc.orig[[var]] <- mcmc[[var]]
+         }
+         flush.buffer <- FALSE
+         append <- TRUE
+		 if (simu == 1) {
+			append <- FALSE
+			flush.buffer <- TRUE
+		 } else {
+			if (simu + 1 > nr_simu) flush.buffer <- TRUE
+		 }
+         store.mcmc(mcmc.orig, append=append, flush.buffer=flush.buffer, countries=countries, 
+         				verbose=verbose)
+         
+	}       # end simu loop MCMC
+    return(mcmc.orig)
+}
