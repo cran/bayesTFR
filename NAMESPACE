@@ -1,0 +1,71 @@
+# export functions
+export(
+	run.tfr.mcmc,
+	continue.tfr.mcmc,
+	run.tfr.mcmc.extra,
+	tfr.predict,
+	tfr.predict.extra,
+	get.ar1.parameters,
+	convert.tfr.trajectories,
+	write.projection.summary,
+	get.tfr.mcmc,
+	has.tfr.mcmc,
+	tfr.mcmc,
+	tfr.mcmc.list,
+	get.thinned.tfr.mcmc,
+	get.tfr.prediction,
+	has.tfr.prediction,
+	get.tfr.convergence.all,
+	get.tfr.convergence,
+	has.mcmc.converged,
+	tfr.parameter.names.extended,
+	tfr.parameter.names.cs.extended,
+	tfr.parameter.names,
+	tfr.parameter.names.cs,
+	get.total.iterations,
+	get.stored.mcmc.length,
+	get.tfr.parameter.traces,
+	get.tfr.parameter.traces.cs,
+	coda.mcmc,
+	coda.mcmc.list,
+	get.cov.gammas,
+	get.country.object,
+	country.names,
+	DLcurve.plot.all,
+	DLcurve.plot,
+	tfr.trajectories.table,
+	tfr.trajectories.plot.all,
+	tfr.trajectories.plot,
+	tfr.partraces.plot,
+	tfr.partraces.cs.plot,
+	tfr.pardensity.plot,
+	tfr.pardensity.cs.plot,
+	get.tfr.map.parameters,
+	tfr.map.all,
+	tfr.map,
+	read.UNtfr,
+	read.tfr.file,
+	read.UNlocations,
+	get.TFRmatrix.and.regions,
+	tfr.gelman.diag,
+	tfr.plot.gelman,
+	tfr.raftery.diag,
+	tfr.diagnose
+)
+
+# register S3 methods
+S3method(do.get.traces, bayesTFR.mcmc)
+
+S3method(get.mcmc.list, bayesTFR.mcmc.set)
+S3method(get.mcmc.list, bayesTFR.mcmc)
+S3method(get.mcmc.list, bayesTFR.prediction)
+S3method(get.mcmc.list, list)
+
+S3method(summary, bayesTFR.mcmc.set)
+S3method(summary, bayesTFR.mcmc)
+S3method(summary, bayesTFR.prediction)
+S3method(summary, bayesTFR.convergence)
+
+S3method(print, summary.bayesTFR.prediction)
+S3method(print, summary.bayesTFR.mcmc.set.meta)
+
