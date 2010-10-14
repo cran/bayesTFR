@@ -790,6 +790,14 @@ summary.bayesTFR.prediction <- function(object, country=NULL, compact=TRUE, ...)
 	res$projections <- cbind(t(object$traj.mean.sd[country$index,,]), t(object$quantiles[country$index,quant.index,]))
 	colnames(res$projections) <- c('mean', 'SD', paste(as.numeric(dimnames(object$quantiles)[[2]][quant.index])*100, '%', sep=''))
 	rownames(res$projections) <- proj.years
+	shift <- get.tfr.shift(country$code, object)
+	res$manual <- FALSE
+	if(!is.null(shift)) {
+		res$projections[,c(1,3:dim(res$projections)[2])] <- res$projections[,c(1,3:dim(res$projections)[2])] + t(matrix(shift,
+												 ncol=nrow(res$projections), nrow=ncol(res$projections)-1, byrow=TRUE))
+		res$manual <- TRUE
+	}
+												 
 	return(res)
 }
 
@@ -805,7 +813,9 @@ print.summary.bayesTFR.prediction <- function(x, digits = 3, ...) {
 	print(ar.table, digits=digits, ...)
 	if(!is.null(x$country.name)) {
 		cat('\nCountry:', x$country.name, '\n')
-		cat('\nProjected TFR:\n')
+		cat('\nProjected TFR:')
+		if(x$manual) cat(' (values have been manually modified)')
+		cat('\n')
 		print(x$projections, digits=digits, ...)
 	}
 }
@@ -905,3 +915,8 @@ burn.and.thin <- function(mcmc, burnin=0, thin=1) {
 }
 
 no.traces.loaded <- function(mcmc) return((length(mcmc$traces) == 1) && mcmc$traces == 0)
+
+get.tfr.trajectories <- function(tfr.pred, country) {
+	country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta)
+	return(get.trajectories(tfr.pred, country.obj$code)$trajectories)
+}

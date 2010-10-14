@@ -29,9 +29,10 @@ tfr.predict <- function(mcmc.set=NULL, end.year=2100,
 	if(use.diagnostics) {
 		diag.list <- get.tfr.convergence.all(mcmc.set$meta$output.dir)
 		ldiag <- length(diag.list)
+		if (ldiag == 0) stop('There is no diagnostics available. Use manual settings of "nr.traj" or "thin".')
 		use.nr.traj <- rep(NA, ldiag)
 		use.burnin <- rep(NA, ldiag)
-		for(idiag in 1:length(diag.list)) {
+		for(idiag in 1:ldiag) {
 			if (has.mcmc.converged(diag.list[[idiag]])) {
 				use.nr.traj[idiag] <- diag$use.nr.traj
 				use.burnin[idiag] <- diag$burnin
@@ -394,8 +395,7 @@ make.tfr.prediction <- function(mcmc.set, end.year=2100, replace.output=FALSE,
 				mu=mu, rho=rho,  sigma_t = sigma_t, sigmaAR1 = sigmaAR1),
 				class='bayesTFR.prediction')
 				
-	prediction.file <- file.path(outdir, 'prediction.rda')
-	save(bayesTFR.prediction, file=prediction.file)
+	store.bayesTFR.prediction(bayesTFR.prediction, outdir)
 	
 	do.convert.trajectories(tfr.pred=bayesTFR.prediction, n=save.as.ascii, output.dir=outdir, verbose=verbose)
 	if(write.summary.files)
@@ -460,6 +460,11 @@ get.prediction.years <- function(meta, n) {
 
 get.prediction.periods <- function(meta, n) {
 	mid.years <- get.prediction.years(meta, n)
+	return (paste(mid.years-3, mid.years+2, sep='-'))
+}
+
+get.tfr.periods <- function(meta) {
+	mid.years <- as.numeric(rownames(meta$tfr_matrix))
 	return (paste(mid.years-3, mid.years+2, sep='-'))
 }
 
@@ -573,40 +578,48 @@ do.write.projection.summary <- function(tfr.pred, output.dir, revision=14) {
 	data(UN_time)
 	data(UN_variants)
 	nr.proj <- tfr.pred$nr.projections+1
+	tfr <- tfr.pred$tfr_matrix_reconstructed
+	ltfr <- dim(tfr)[1] - 1
+	nr.proj.all <- nr.proj + ltfr
+	tfr.years <- get.tfr.periods(tfr.pred$mcmc.set$meta)
 	pred.period <- get.prediction.periods(tfr.pred$mcmc.set$meta, nr.proj)
 	header1 <- list(country.name='country_name',  country.code='country_code', variant='variant')
 	un.time.idx <- c()
 	un.time.label <- as.character(UN_time[,'TLabel'])
 	l.un.time.label <- length(un.time.label)
+	for (i in 1:ltfr) 
+		un.time.idx <- c(un.time.idx, which(un.time.label==tfr.years[i])[1])
 	for (i in 1:nr.proj) {
 		header1[[paste('year', i, sep='')]] <- pred.period[i]
-		un.time.idx <- c(un.time.idx, (1:l.un.time.label)[un.time.label==pred.period[i]])
+		un.time.idx <- c(un.time.idx, which(un.time.label==pred.period[i]))
 	}
+	
 	header2 <- list(revision='RevID', variant='VarID', country='LocID', year='TimeID', tfr='TFR')
 	nr.var <- 8 # median, upper and lower of 80 and 95%, upper and lower of +-0.5 child, constant
 	UN.variant.names <- c('BHM median', 'BHM80 lower',  'BHM80 upper', 'BHM95 lower',  'BHM95 upper', 'LR Low', 'LR High', 'LR constant fertility')
 	result1 <- result2 <- NULL
 	for (country in 1:tfr.pred$mcmc.set$meta$nr_countries) {
 		country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta, index=TRUE)
+		this.tfr <- tfr[,country.obj$index][1:ltfr]
 		this.result1 <- cbind(
 				country.name=rep(country.obj$name, nr.var), 
 				country.code=rep(country.obj$code, nr.var),
 				variant=c('median', 'lower 80', 'upper 80', 'lower 95', 'upper 95', '-0.5child', '+0.5child', 'constant'))
-		median <- get.median.from.prediction(tfr.pred, country.obj$index)
+		median <- get.median.from.prediction(tfr.pred, country.obj$index, country.obj$code)
 		proj.result <- round(rbind(median, 
-							   get.traj.quantiles(tfr.pred, country.obj$index, pi=80),
-							   get.traj.quantiles(tfr.pred, country.obj$index, pi=95),
+							   get.traj.quantiles(tfr.pred, country.obj$index, country.obj$code, pi=80),
+							   get.traj.quantiles(tfr.pred, country.obj$index, country.obj$code, pi=95),
 							   get.half.child.variant(median),
-							   rep(median[1], nr.proj)), 2)
+							   rep(median[1], nr.proj)), 4)
 		colnames(proj.result) <- grep('year', names(header1), value=TRUE)
 		this.result1 <- cbind(this.result1, proj.result)
 		result1 <- rbind(result1, this.result1)
 		for(ivar in 1:nr.var) {
-			result2 <- rbind(result2, cbind(revision=rep(revision, nr.proj), 
-								   variant=rep(UN_variants[UN_variants[,'Vshort']==UN.variant.names[ivar],'VarID'], nr.proj),
-								   country=rep(country.obj$code, nr.proj),
+			result2 <- rbind(result2, cbind(revision=rep(revision, nr.proj.all), 
+								   variant=rep(UN_variants[UN_variants[,'Vshort']==UN.variant.names[ivar],'VarID'], nr.proj.all),
+								   country=rep(country.obj$code, nr.proj.all),
 								   year=UN_time[un.time.idx,'TimeID'],
-								   tfr=proj.result[ivar,]))
+								   tfr=c(this.tfr, proj.result[ivar,])))
 		}
 	}
 	colnames(result1)[colnames(result1)==names(header1)] <- header1
@@ -624,4 +637,73 @@ get.tfr.reconstructed <- function(tfr, meta) {
 	tfr_matrix_reconstructed <- tfr
 	if(is.null(tfr_matrix_reconstructed)) tfr_matrix_reconstructed <- meta$tfr_matrix_all
 	return(tfr_matrix_reconstructed)
+}
+
+get.tfr.shift <- function(country.code, pred) {
+	if(is.null(pred$median.shift)) return(NULL)
+	return(pred$median.shift[[as.character(country.code)]])
+}
+
+tfr.median.shift <- function(sim.dir, country, reset=FALSE, shift=0, from=NULL, to=NULL) {
+	pred <- get.tfr.prediction(sim.dir)
+	meta <- pred$mcmc.set$meta
+	country.obj <- get.country.object(country, meta=meta)
+	if(is.null(country.obj$name)) stop('Country not found.')
+	tfr.shift <- get.tfr.shift(country.obj$code, pred)
+	pred.years <- as.numeric(dimnames(pred$quantiles)[[3]])
+	nr.proj <- pred$nr.projections+1 
+	if(is.null(from)) from <- pred.years[2]
+	if(is.null(to)) to <- pred.years[nr.proj]
+	which.years <- (pred.years >= from) & (pred.years <= to)
+	all.years <- FALSE
+	if(reset) { # reset to 0
+		if (sum(which.years) >= nr.proj-1) {
+			tfr.shift <- NULL # reset everything
+			all.years <- TRUE
+		} else tfr.shift[which.years] <- 0 
+		action <- 'reset to BHM values'
+	} else { # shift by given amount
+		if(is.null(tfr.shift)) tfr.shift <- rep(0, nr.proj)
+		tfr.shift[which.years] <- tfr.shift[which.years] + shift
+		action <- 'modified'
+	}
+	if(sum(tfr.shift) == 0) tfr.shift <- NULL
+	pred$median.shift[[as.character(country.obj$code)]] <- tfr.shift
+	store.bayesTFR.prediction(pred)
+	cat('\nMedian of', country.obj$name, action, 
+		if(all.years) 'for all years' else c('for years', pred.years[which.years]), '.\n')
+	invisible(pred)
+}
+
+tfr.median.set <- function(sim.dir, country, values, years=NULL) {
+	pred <- get.tfr.prediction(sim.dir)
+	meta <- pred$mcmc.set$meta
+	country.obj <- get.country.object(country, meta=meta)
+	if(is.null(country.obj$name)) stop('Country not found.')
+	tfr.shift <- get.tfr.shift(country.obj$code, pred)
+	pred.years <- as.numeric(dimnames(pred$quantiles)[[3]])
+	nr.proj <- pred$nr.projections+1 
+	if(is.null(years)) years <- pred.years[2:nr.proj]
+	mid.years <- cut(years, labels=pred.years, 
+					breaks=seq(from=pred.years[1]-3, to=pred.years[nr.proj]+2, by=5))
+	which.years <- is.element(pred.years, mid.years)
+	lvalues <- length(values)
+	if(lvalues > sum(which.years)) {
+		start <- which.max(cumsum(which.years))+1
+		end <- min(start + lvalues - sum(which.years), nr.proj)
+		if(start > end) stop ('Mismatch in length of values and years.')
+		which.years[start:end] <- TRUE
+	}
+	if(lvalues < sum(which.years)) { 
+		start <- which(cumsum(which.years)==lvalues)[1]+1
+		which.years[start:nr.proj] <- FALSE
+	}
+	if(is.null(tfr.shift)) tfr.shift <- rep(0, nr.proj)
+	medians <- pred$quantiles[country.obj$index, '0.5',]
+	tfr.shift[which.years] <- values - medians[which.years]
+	if(sum(tfr.shift) == 0) tfr.shift <- NULL
+	pred$median.shift[[as.character(country.obj$code)]] <- tfr.shift
+	store.bayesTFR.prediction(pred)
+	cat('\nMedian of', country.obj$name, 'modified for years', pred.years[which.years], '\n')
+	invisible(pred)
 }

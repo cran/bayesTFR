@@ -1,3 +1,13 @@
+1.1-0 (10/14/2010)
+-----
+Functions tfr.median.set and tfr.median.shift for modifying the projection medians (request of the UN population division).
+
+The UN2008.txt file replaced by one whith TFRs on 4 decimal places (provided by the UN). Projection summary files are outputted also with 4 decimals.
+
+The projection_summary.csv contains also the historical data.
+
+New function: get.tfr.trajectories
+
 1.0-0 (10/04/2010)
 -----
 Convergence diagnostics functions re-designed.

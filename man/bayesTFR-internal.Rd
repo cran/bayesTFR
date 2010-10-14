@@ -31,6 +31,7 @@
 \alias{get.mcmc.list.bayesTFR.mcmc.set}
 \alias{get.mcmc.list.bayesTFR.prediction}
 \alias{get.mcmc.list.list}
+\alias{get.median.from.prediction}
 \alias{get.meta.only}
 \alias{get.newTFRcolnames}
 \alias{get.observed.time.matrix.and.regions}
@@ -47,7 +48,6 @@
 \alias{get.trans.parameter.names}
 \alias{get.trans.parameter.names.cs}
 \alias{get.traj.quantiles}
-\alias{get.median.from.prediction}
 \alias{get.trajectories}
 \alias{get_eps_T}
 \alias{get_eps_T_all}

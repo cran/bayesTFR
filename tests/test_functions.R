@@ -1,4 +1,3 @@
-library(bayesTFR)
 
 test.load.UNtfr <- function(wpp.year=2008) {
 	# read the UN TFR input file
@@ -61,11 +60,30 @@ test.run.mcmc.simulation <- function() {
 	m <- run.tfr.mcmc.extra(sim.dir=sim.dir, countries=903, burnin=0)
 	# run prediction only for the area 903
 	pred <- tfr.predict.extra(sim.dir=sim.dir, verbose=FALSE)
-	unlink(sim.dir, recursive=TRUE)
+
 	#stopifnot(is.element(903, pred$mcmc.set$regions$country_code))
 	stopifnot(dim(pred$tfr_matrix_reconstructed)[2] == npred+1)
 	cat('\n===> Test of running projections on extra areas OK.\n')
-
+	
+	projs <- summary(pred, country='Uganda')$projections
+	tfr.median.shift(sim.dir, country='Uganda', shift=1.5, from=2051, to=2080)
+	shifted.pred <- get.tfr.prediction(sim.dir)
+	shifted.projs <- summary(shifted.pred, country='Uganda')$projections
+	stopifnot(all(projs[10:15,c(1,3:dim(projs)[2])]+1.5 == shifted.projs[10:15,c(1,3:dim(projs)[2])]))
+	stopifnot(all(projs[c(1:9, 16:19),c(1,3:dim(projs)[2])] == shifted.projs[c(1:9, 16:19),c(1,3:dim(projs)[2])]))
+	cat('\n===> Test of shifting the median OK.\n')
+	shifted.pred <- tfr.median.shift(sim.dir, country='Uganda', reset = TRUE)
+	shifted.projs <- summary(shifted.pred, country='Uganda')$projections
+	stopifnot(all(projs[,c(1,3:dim(projs)[2])] == shifted.projs[,c(1,3:dim(projs)[2])]))
+	cat('\n===> Test of resetting the median OK.\n')
+	expert.values <- c(2.3, 2.4, 2.4)
+	shift <- expert.values - pred$quantiles[15, '0.5',4:6] # Uganda has index 15
+	mod.pred <- tfr.median.set(sim.dir, country='Uganda', values=expert.values, years=2024)
+	mod.projs <- summary(mod.pred, country='Uganda')$projections
+	stopifnot(all(mod.projs[4:6, c(1,3:dim(projs)[2])]==projs[4:6, c(1,3:dim(projs)[2])]+shift))
+	stopifnot(all(mod.projs[c(1:3,7:19), c(1,3:dim(projs)[2])]==projs[c(1:3,7:19), c(1,3:dim(projs)[2])]))
+	cat('\n===> Test of setting the median OK.\n')
+	unlink(sim.dir, recursive=TRUE)
 }
 
 test.thinned.simulation <- function() {
@@ -224,15 +242,5 @@ test.get.parameter.traces <- function() {
 	cat('\n===> Test of getting parameter traces OK.\n')
 }
 
-test.load.UNtfr()
-test.load.UNlocations()
-test.create.tfr.matrix()
-test.run.mcmc.simulation()
-#test.thinned.simulation()
-test.existing.simulation()
-test.DLcurve()
-test.TFRtrajectories()
-test.plot.density()
-test.get.parameter.traces()
-#test.plot.map()
-#test.run.mcmc.simulation.auto()
+
+	
