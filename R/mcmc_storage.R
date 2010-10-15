@@ -163,3 +163,9 @@ store.bayesTFR.meta.object <- function(meta, output.dir) {
 	bayesTFR.mcmc.meta <- meta
 	save(bayesTFR.mcmc.meta, file=file.path(output.dir, 'bayesTFR.mcmc.meta.rda'))
 }
+
+store.bayesTFR.prediction <- function(pred, output.dir=NULL) {
+	bayesTFR.prediction <- pred
+	if (is.null(output.dir)) output.dir <- pred$output.directory
+	save(bayesTFR.prediction, file=file.path(output.dir, 'prediction.rda'))
+}

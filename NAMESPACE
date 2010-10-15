@@ -5,6 +5,8 @@ export(
 	run.tfr.mcmc.extra,
 	tfr.predict,
 	tfr.predict.extra,
+	tfr.median.shift,
+	tfr.median.set,
 	get.ar1.parameters,
 	convert.tfr.trajectories,
 	write.projection.summary,
@@ -26,6 +28,7 @@ export(
 	get.stored.mcmc.length,
 	get.tfr.parameter.traces,
 	get.tfr.parameter.traces.cs,
+	get.tfr.trajectories,
 	coda.mcmc,
 	coda.mcmc.list,
 	get.cov.gammas,
@@ -50,7 +53,8 @@ export(
 	tfr.gelman.diag,
 	tfr.plot.gelman,
 	tfr.raftery.diag,
-	tfr.diagnose
+	tfr.diagnose,
+	get.median.from.prediction
 )
 
 # register S3 methods

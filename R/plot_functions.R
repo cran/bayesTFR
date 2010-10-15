@@ -116,12 +116,12 @@ tfr.trajectories.table <- function(tfr.pred, country, pi=c(80, 95), half.child.v
 	tfr <- as.matrix(tfr_matrix_reconstructed[,country$index], ncol=1)
 	rownames(tfr) <- x1
 	pred.table <- matrix(NA, ncol=2*length(pi)+1, nrow=l)
-	pred.table[,1] <- get.median.from.prediction(tfr.pred, country$index)[2:(l+1)]
+	pred.table[,1] <- get.median.from.prediction(tfr.pred, country$index, country$code)[2:(l+1)]
 	colnames(pred.table) <- c('median', rep(NA,ncol(pred.table)-1))
 	trajectories <- get.trajectories(tfr.pred, country$code)
 	idx <- 2
 	for (i in 1:length(pi)) {
-		cqp <- get.traj.quantiles(tfr.pred, country$index, trajectories$trajectories, pi[i])
+		cqp <- get.traj.quantiles(tfr.pred, country$index, country$code, trajectories$trajectories, pi[i])
 		al <- (1-pi[i]/100)/2
 		if (!is.null(cqp)) {
 			pred.table[,idx:(idx+1)] <- t(cqp[,2:(l+1)])
@@ -154,14 +154,22 @@ get.trajectories <- function(tfr.pred, country, nr.traj=NULL) {
 		trajectories <- NULL
 		traj.idx <- NULL
 	}
+	if(!is.null(trajectories)) {
+		shift <- get.tfr.shift(country, tfr.pred)
+	 	if(!is.null(shift)) trajectories <- trajectories + shift
+	 	rownames(trajectories) <- get.prediction.years(tfr.pred$mcmc.set$meta, dim(trajectories)[1])
+	 }
 	return(list(trajectories=trajectories, index=traj.idx))
 }
 
-get.median.from.prediction <- function(tfr.pred, country.index) {
-	return(tfr.pred$quantiles[country.index, '0.5',])
+get.median.from.prediction <- function(tfr.pred, country.index, country.code) {
+	median <- tfr.pred$quantiles[country.index, '0.5',]
+	shift <- get.tfr.shift(country.code, tfr.pred)
+	if(!is.null(shift)) median <- median + shift
+	return(median)
 }
 	
-get.traj.quantiles <- function(tfr.pred, country.index, trajectories=NULL, pi=80) {
+get.traj.quantiles <- function(tfr.pred, country.index, country.code, trajectories=NULL, pi=80) {
 	al <- (1-pi/100)/2
 	quantile.values <- as.numeric(dimnames(tfr.pred$quantiles)[[2]])
 	alidx<-round(quantile.values,6)==round(al,6)
@@ -187,6 +195,8 @@ get.traj.quantiles <- function(tfr.pred, country.index, trajectories=NULL, pi=80
 						quantile, c(al, 1-al), na.rm = TRUE)
 		}
 	}
+	shift <- get.tfr.shift(country.code, tfr.pred)
+	if(!is.null(shift)) cqp <- cqp + matrix(shift, nrow=nrow(cqp), ncol=ncol(cqp), byrow=TRUE)
 	return(cqp)
 }
 	
@@ -264,12 +274,12 @@ tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95),
 		}
 	}
 	# plot median
-	tfr.median <- tfr.pred$quantiles[country$index, '0.5',]
+	tfr.median <- get.median.from.prediction(tfr.pred, country$index, country$code)
 	lines(x2, tfr.median, type='l', col='red', lwd=2) 
 	# plot given CIs
 	lty <- 2:(length(pi)+1)
 	for (i in 1:length(pi)) {
-		cqp <- get.traj.quantiles(tfr.pred, country$index, trajectories$trajectories, pi[i])
+		cqp <- get.traj.quantiles(tfr.pred, country$index, country$code, trajectories$trajectories, pi[i])
 		if (!is.null(cqp)) {
 			lines(x2, cqp[1,], type='l', col='red', lty=lty[i], lwd=2)
 			lines(x2, cqp[2,], type='l', col='red', lty=lty[i], lwd=2)
