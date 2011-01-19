@@ -10,6 +10,8 @@ test.DLcurve()
 test.TFRtrajectories()
 test.plot.density()
 test.get.parameter.traces()
+# disable the last three when submitting to CRAN
+# to speed-up the checking procedure
 #test.plot.map()
 #test.thinned.simulation()
 #test.run.mcmc.simulation.auto()

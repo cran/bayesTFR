@@ -169,3 +169,10 @@ store.bayesTFR.prediction <- function(pred, output.dir=NULL) {
 	if (is.null(output.dir)) output.dir <- pred$output.directory
 	save(bayesTFR.prediction, file=file.path(output.dir, 'prediction.rda'))
 }
+
+store.bayesTFR.convergence <- function(diag, thin, burnin, output.dir){
+	save.file <- file.path(output.dir, paste('bayesTFR.convergence_', thin, '_', burnin, '.rda', sep=''))
+	bayesTFR.convergence <- diag
+	save(bayesTFR.convergence, file=save.file)
+	return(save.file)
+}

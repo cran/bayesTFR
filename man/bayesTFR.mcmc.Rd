@@ -28,7 +28,7 @@ Furthermore, the object contains components:
 \item{meta}{Object of class \code{\link{bayesTFR.mcmc.meta}} used for simulation of this chain.}
 }
 \details{
-An object \code{bayesTFR.mcmc} points to a place on disk (\code{output.dir}) where MCMC results from all iterations are stored. They can be retrieve to the memory using \code{\link{get.tfr.mcmc}(\dots)} and \code{\link{tfr.mcmc}(\dots)}. 
+An object \code{bayesTFR.mcmc} points to a place on disk (element \code{output.dir}) where MCMC results from all iterations are stored. They can be retrieved to the memory using \code{\link{get.tfr.mcmc}(\dots)} and \code{\link{tfr.mcmc}(\dots)}. 
 
 The object is in standard cases not to be manipulated by itself, but rather as part of a \code{\link{bayesTFR.mcmc.set}} object.
 }

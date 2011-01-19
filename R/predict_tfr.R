@@ -114,9 +114,9 @@ tfr.predict.extra <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'),
 	prediction.file <- file.path(pred$output.dir, 'prediction.rda')
 	save(bayesTFR.prediction, file=prediction.file)
 	
-	do.convert.trajectories(tfr.pred=bayesTFR.prediction, n=save.as.ascii, output.dir=pred$output.dir, 
+	do.convert.trajectories(pred=bayesTFR.prediction, n=save.as.ascii, output.dir=pred$output.dir, 
 							verbose=verbose)
-	do.write.projection.summary(tfr.pred=bayesTFR.prediction, output.dir=pred$output.dir)
+	do.write.projection.summary(pred=bayesTFR.prediction, output.dir=pred$output.dir)
 	
 	cat('\nPrediction stored into', pred$output.dir, '\n')
 	invisible(bayesTFR.prediction)
@@ -157,7 +157,7 @@ make.tfr.prediction <- function(mcmc.set, end.year=2100, replace.output=FALSE,
 	outdir <- file.path(output.dir, 'predictions')
 	
 	if(is.null(countries)) {
-		if(!replace.output && has.tfr.prediction(mcmc.set))
+		if(!replace.output && has.tfr.prediction(sim.dir=output.dir))
 			stop('Prediction in ', outdir,
 			' already exists.\nSet replace.output=TRUE if you want to overwrite existing projections.')
 		unlink(outdir, recursive=TRUE)
@@ -168,13 +168,10 @@ make.tfr.prediction <- function(mcmc.set, end.year=2100, replace.output=FALSE,
 	thinned.mcmc <- get.thinned.tfr.mcmc(mcmc.set, thin=thin, burnin=burnin)
 	has.thinned.mcmc <- !is.null(thinned.mcmc) && thinned.mcmc$meta$parent.iter == total.iter
 	load.mcmc.set <- if(has.thinned.mcmc) thinned.mcmc
-					 else create.thinned.tfr.mcmc(mcmc.set, thin=thin, burnin=burnin, verbose=verbose)
+					 else create.thinned.tfr.mcmc(mcmc.set, thin=thin, burnin=burnin, 
+					 							output.dir=output.dir, verbose=verbose)
 	nr_simu <- load.mcmc.set$mcmc.list[[1]]$finished.iter
 
-	if(load.mcmc.set$meta$nr_countries != mcmc.set$meta$nr_countries) {
-				# Probably there have been extra countries added to mcmc.set since the thinned set was created
-	
-	}
 	if (verbose) cat('Load variance parameters.\n')
 	var.par.names <- c('sigma0', 'a_sd', 'b_sd', 'S_sd', 'const_sd')
 	
@@ -397,9 +394,9 @@ make.tfr.prediction <- function(mcmc.set, end.year=2100, replace.output=FALSE,
 				
 	store.bayesTFR.prediction(bayesTFR.prediction, outdir)
 	
-	do.convert.trajectories(tfr.pred=bayesTFR.prediction, n=save.as.ascii, output.dir=outdir, verbose=verbose)
+	do.convert.trajectories(pred=bayesTFR.prediction, n=save.as.ascii, output.dir=outdir, verbose=verbose)
 	if(write.summary.files)
-		do.write.projection.summary(tfr.pred=bayesTFR.prediction, output.dir=outdir)
+		tfr.write.projection.summary.and.parameters(pred=bayesTFR.prediction, output.dir=outdir)
 	
 	cat('\nPrediction stored into', outdir, '\n')
 	invisible(bayesTFR.prediction)
@@ -433,9 +430,14 @@ remove.tfr.traces <- function(mcmc.set) {
 	invisible(mcmc.set)
 }
 
+"get.traj.ascii.header" <- function(meta, ...) UseMethod("get.traj.ascii.header")
+get.traj.ascii.header.bayesTFR.mcmc.meta <- function(meta, ...) 
+	return (list(country_code='LocID', period='Period', year='Year', trajectory='Trajectory', tfr='TF'))
+		
 store.traj.ascii <- function(trajectories, n, output.dir, country.code, meta, index, append=FALSE) {
 	# Store trajectories into ASCII files of a specific UN format 
-	header <- list(country_code='LocID', period='Period', year='Year', trajectory='Trajectory', tfr='TF')
+	#header <- list(country_code='LocID', period='Period', year='Year', trajectory='Trajectory', tfr='TF')
+	header <- get.traj.ascii.header(meta)
 	nyears <- dim(trajectories)[1]
 	pred.years <- get.prediction.years(meta, nyears)
 	pred.period <- get.prediction.periods(meta, nyears)
@@ -454,7 +456,7 @@ store.traj.ascii <- function(trajectories, n, output.dir, country.code, meta, in
 }
 
 get.prediction.years <- function(meta, n) {
-	present.year <- as.numeric(rownames(meta$tfr_matrix)[nrow(meta$tfr_matrix)])
+	present.year <- as.numeric(rownames(get.data.matrix(meta))[nrow(get.data.matrix(meta))])
 	return (seq(present.year, length=n, by=5))
 }
 
@@ -464,16 +466,16 @@ get.prediction.periods <- function(meta, n) {
 }
 
 get.tfr.periods <- function(meta) {
-	mid.years <- as.numeric(rownames(meta$tfr_matrix))
+	mid.years <- as.numeric(rownames(get.data.matrix(meta)))
 	return (paste(mid.years-3, mid.years+2, sep='-'))
 }
 
-do.convert.trajectories <- function(tfr.pred, n, output.dir, verbose=FALSE) {
+do.convert.trajectories <- function(pred, n, output.dir, verbose=FALSE) {
 	# Converts all trajectory rda files into UN ascii, selecting n trajectories by equal spacing.
 	if(n==0) return(NULL)
-	nr.simu <- tfr.pred$nr.traj
+	nr.simu <- pred$nr.traj
 	has.na <- rep(FALSE, nr.simu)
-	has.na[tfr.pred$na.index] <- TRUE
+	has.na[pred$na.index] <- TRUE
 	if (n=='all') n <- nr.simu
 	selected.traj <- get.thinning.index(n, nr.simu)
 	is.selected <- rep(FALSE, nr.simu)
@@ -505,10 +507,11 @@ do.convert.trajectories <- function(tfr.pred, n, output.dir, verbose=FALSE) {
 	index <- (1:nr.simu)[is.selected]
 	country.codes <- country.names <- c()
 	result.wide <- c()
-	for (country in 1:tfr.pred$mcmc.set$meta$nr_countries) {
-		country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta, index=TRUE)
+	header <- get.traj.ascii.header(pred$mcmc.set$meta)
+	for (country in 1:get.nr.countries(pred$mcmc.set$meta)) {
+		country.obj <- get.country.object(country, pred$mcmc.set$meta, index=TRUE)
 		if(verbose) cat('Converting trajectories for', country.obj$name, '(code', country.obj$code, ')\n')
-		trajectories <- get.trajectories(tfr.pred, country.obj$code)$trajectories
+		trajectories <- get.trajectories(pred, country.obj$code)$trajectories
 		if (is.null(trajectories)) {
 			warning('No trajectories for ', country.obj$name, ' (code ', country.obj$code, ')')
 		} else {
@@ -516,11 +519,11 @@ do.convert.trajectories <- function(tfr.pred, n, output.dir, verbose=FALSE) {
 			country.names <- c(country.names, country.obj$name)
 			append <- country > 1
 			result <- store.traj.ascii(trajectories, n, output.dir, country.obj$code, 
-							tfr.pred$mcmc.set$meta, index=index, append=append)
+							pred$mcmc.set$meta, index=index, append=append)
 			if(!append) {
 				result.wide <- result[,2:5]
 			} else {
-				result.wide <- cbind(result.wide, result[,'TF'])
+				result.wide <- cbind(result.wide, result[,header$tfr])
 			}
 		}
 	}
@@ -561,28 +564,82 @@ convert.tfr.trajectories <- function(dir=file.path(getwd(), 'bayesTFR.output'),
 		}
 		pred$na.index <- (1:pred$nr.traj)[hasNAs]
 	}
-	do.convert.trajectories(tfr.pred=pred, n=n, output.dir=output.dir, verbose=verbose)
+	do.convert.trajectories(pred=pred, n=n, output.dir=output.dir, verbose=verbose)
 }
 
 write.projection.summary <- function(dir=file.path(getwd(), 'bayesTFR.output'), 
 									 output.dir=NULL, revision=14) {
-# Writes two prediction summary files, one in a user-friendly format, one in a UN-format.
+# Writes three prediction summary files, one in a user-friendly format, one in a UN-format,
+# and one parameter file.
 	pred <- get.tfr.prediction(sim.dir=dir)
 	if (is.null(output.dir)) output.dir <- pred$output.directory
 	if(!file.exists(output.dir)) dir.create(output.dir, recursive=TRUE)
-	do.write.projection.summary(pred, output.dir, revision=revision)
+	tfr.write.projection.summary.and.parameters(pred, output.dir, revision=revision)
 }
 
-do.write.projection.summary <- function(tfr.pred, output.dir, revision=14) {
+tfr.write.projection.summary.and.parameters <- function(pred, output.dir, revision=14) {
+	do.write.projection.summary(pred, output.dir, revision=revision)
+	
+	meta <- pred$mcmc.set$meta
+	tfr.years <- get.tfr.periods(meta)
+	all.years <- c(tfr.years, get.prediction.periods(meta, pred$nr.projections+1)[-1])
+	tfr <- get.data.imputed(pred)
+	nr.data <- pred$nr.projections+dim(tfr)[1]
+	# write parameters file
+	par.header <- list(country.name="country_name", country.code="country_code", 
+					tau.c="TF_time_start_decline", Uc="TF_max", dc="TF_max_decrement",  
+					Triangle.c4="TF_end_level", Triangle.c4.low="TF_end_level_low", 
+					Triangle.c4.high="TF_end_level_high", Tend="TF_time_end_decline")
+	result <- NULL
+	precision<-4
+	for (country in 1:get.nr.countries(meta)) {
+		country.obj <- get.country.object(country, meta, index=TRUE)
+		tfr.and.pred.median <- c(tfr[,country], get.median.from.prediction(pred, country.obj$index, country.obj$code)[-1])
+		s <- summary(coda.mcmc.list(pred$mcmc.set, country=country.obj$code, 
+					par.names=NULL, par.names.cs=tfr.parameter.names.cs(trans=FALSE), 
+					thin=1, burnin=0))
+		lambda_c <- find.lambda.for.one.country(tfr.and.pred.median, nr.data)
+		result <- rbind(result, c(country.obj$name, country.obj$code, 
+			if(meta$tau_c[country] > 0) tfr.years[meta$tau_c[country]] else -1, #tau_c
+			round(s$statistics[paste('U_c',country.obj$code, sep=''),1],precision), # TFR at tau_c
+			round(s$statistics[paste('d_c',country.obj$code, sep=''),1],precision),
+			round(s$statistics[paste('Triangle_c4_c',country.obj$code, sep=''),1],precision),
+			round(s$quantiles[paste('Triangle_c4_c',country.obj$code, sep=''),'2.5%'],precision),
+			round(s$quantiles[paste('Triangle_c4_c',country.obj$code, sep=''),'97.5%'],precision),
+			all.years[lambda_c]
+			))
+	}
+	colnames(result) <- par.header
+	write.table(result, file=file.path(output.dir, 'projection_summary_parameters.csv'), sep=',', 
+					row.names=FALSE, col.names=TRUE)
+	cat('Parameter summary stored into: \n', 
+			file.path('\t\t', output.dir, 'projection_summary_parameters.csv'), '\n')
+
+}
+
+"get.projection.summary.header" <- function(pred, ...) UseMethod("get.projection.summary.header")
+get.projection.summary.header.bayesTFR.prediction <- function(pred, ...) 
+	return (list(revision='RevID', variant='VarID', country='LocID', year='TimeID', tfr='TFR'))
+
+"get.UN.variant.names" <- function(pred, ...) UseMethod("get.UN.variant.names")
+get.UN.variant.names.bayesTFR.prediction <- function(pred, ...) 
+	return(c('BHM median', 'BHM80 lower',  'BHM80 upper', 'BHM95 lower',  'BHM95 upper', 'Low', 
+					'High', 'Constant fertility'))
+					
+"get.friendly.variant.names" <- function(pred, ...) UseMethod("get.friendly.variant.names")
+get.friendly.variant.names.bayesTFR.prediction <- function(pred, ...)
+	return(c('median', 'lower 80', 'upper 80', 'lower 95', 'upper 95', '-0.5child', '+0.5child', 'constant'))
+
+do.write.projection.summary <- function(pred, output.dir, revision=14) {
 	cat('Creating summary files ...\n')
 	data(UN_time)
 	data(UN_variants)
-	nr.proj <- tfr.pred$nr.projections+1
-	tfr <- tfr.pred$tfr_matrix_reconstructed
+	nr.proj <- pred$nr.projections+1
+	tfr <- get.data.imputed(pred)
 	ltfr <- dim(tfr)[1] - 1
 	nr.proj.all <- nr.proj + ltfr
-	tfr.years <- get.tfr.periods(tfr.pred$mcmc.set$meta)
-	pred.period <- get.prediction.periods(tfr.pred$mcmc.set$meta, nr.proj)
+	tfr.years <- get.tfr.periods(pred$mcmc.set$meta)
+	pred.period <- get.prediction.periods(pred$mcmc.set$meta, nr.proj)
 	header1 <- list(country.name='country_name',  country.code='country_code', variant='variant')
 	un.time.idx <- c()
 	un.time.label <- as.character(UN_time[,'TLabel'])
@@ -593,24 +650,27 @@ do.write.projection.summary <- function(tfr.pred, output.dir, revision=14) {
 		header1[[paste('year', i, sep='')]] <- pred.period[i]
 		un.time.idx <- c(un.time.idx, which(un.time.label==pred.period[i]))
 	}
-	
-	header2 <- list(revision='RevID', variant='VarID', country='LocID', year='TimeID', tfr='TFR')
-	nr.var <- 8 # median, upper and lower of 80 and 95%, upper and lower of +-0.5 child, constant
-	UN.variant.names <- c('BHM median', 'BHM80 lower',  'BHM80 upper', 'BHM95 lower',  'BHM95 upper', 'LR Low', 'LR High', 'LR constant fertility')
+	header2 <- get.projection.summary.header(pred)
+	UN.variant.names <- get.UN.variant.names(pred)
+	friendly.variant.names <- get.friendly.variant.names(pred)
+	nr.var <- length(UN.variant.names)
 	result1 <- result2 <- NULL
-	for (country in 1:tfr.pred$mcmc.set$meta$nr_countries) {
-		country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta, index=TRUE)
+	for (country in 1:get.nr.countries(pred$mcmc.set$meta)) {
+		country.obj <- get.country.object(country, pred$mcmc.set$meta, index=TRUE)
 		this.tfr <- tfr[,country.obj$index][1:ltfr]
 		this.result1 <- cbind(
 				country.name=rep(country.obj$name, nr.var), 
 				country.code=rep(country.obj$code, nr.var),
-				variant=c('median', 'lower 80', 'upper 80', 'lower 95', 'upper 95', '-0.5child', '+0.5child', 'constant'))
-		median <- get.median.from.prediction(tfr.pred, country.obj$index, country.obj$code)
-		proj.result <- round(rbind(median, 
-							   get.traj.quantiles(tfr.pred, country.obj$index, country.obj$code, pi=80),
-							   get.traj.quantiles(tfr.pred, country.obj$index, country.obj$code, pi=95),
-							   get.half.child.variant(median),
-							   rep(median[1], nr.proj)), 4)
+				variant=friendly.variant.names)
+		median <- get.median.from.prediction(pred, country.obj$index, country.obj$code)
+		proj.result <- rbind(median, 
+							   get.traj.quantiles(pred, country.obj$index, country.obj$code, pi=80),
+							   get.traj.quantiles(pred, country.obj$index, country.obj$code, pi=95))
+		if(any(friendly.variant.names == '-0.5child'))
+			proj.result <- rbind(proj.result,
+					   get.half.child.variant(median))
+		proj.result <- round(rbind(proj.result,
+							   		rep(median[1], nr.proj)), 4)
 		colnames(proj.result) <- grep('year', names(header1), value=TRUE)
 		this.result1 <- cbind(this.result1, proj.result)
 		result1 <- rbind(result1, this.result1)
@@ -644,12 +704,12 @@ get.tfr.shift <- function(country.code, pred) {
 	return(pred$median.shift[[as.character(country.code)]])
 }
 
-tfr.median.shift <- function(sim.dir, country, reset=FALSE, shift=0, from=NULL, to=NULL) {
-	pred <- get.tfr.prediction(sim.dir)
+.bdem.median.shift <- function(type, sim.dir, country, reset=FALSE, shift=0, from=NULL, to=NULL) {
+	pred <- do.call(paste('get.', type, '.prediction', sep=''), list(sim.dir))
 	meta <- pred$mcmc.set$meta
 	country.obj <- get.country.object(country, meta=meta)
 	if(is.null(country.obj$name)) stop('Country not found.')
-	tfr.shift <- get.tfr.shift(country.obj$code, pred)
+	bdem.shift <- do.call(paste('get.', type, '.shift', sep=''), list(country.obj$code, pred))
 	pred.years <- as.numeric(dimnames(pred$quantiles)[[3]])
 	nr.proj <- pred$nr.projections+1 
 	if(is.null(from)) from <- pred.years[2]
@@ -658,29 +718,34 @@ tfr.median.shift <- function(sim.dir, country, reset=FALSE, shift=0, from=NULL, 
 	all.years <- FALSE
 	if(reset) { # reset to 0
 		if (sum(which.years) >= nr.proj-1) {
-			tfr.shift <- NULL # reset everything
+			bdem.shift <- NULL # reset everything
 			all.years <- TRUE
-		} else tfr.shift[which.years] <- 0 
+		} else bdem.shift[which.years] <- 0 
 		action <- 'reset to BHM values'
 	} else { # shift by given amount
-		if(is.null(tfr.shift)) tfr.shift <- rep(0, nr.proj)
-		tfr.shift[which.years] <- tfr.shift[which.years] + shift
+		if(is.null(bdem.shift)) bdem.shift <- rep(0, nr.proj)
+		bdem.shift[which.years] <- bdem.shift[which.years] + shift
 		action <- 'modified'
 	}
-	if(sum(tfr.shift) == 0) tfr.shift <- NULL
-	pred$median.shift[[as.character(country.obj$code)]] <- tfr.shift
-	store.bayesTFR.prediction(pred)
+	if(sum(bdem.shift) == 0) bdem.shift <- NULL
+	pred$median.shift[[as.character(country.obj$code)]] <- bdem.shift
+	do.call(paste('store.', class(pred), sep=''), list(pred))
 	cat('\nMedian of', country.obj$name, action, 
 		if(all.years) 'for all years' else c('for years', pred.years[which.years]), '.\n')
-	invisible(pred)
+	return(pred)
 }
 
-tfr.median.set <- function(sim.dir, country, values, years=NULL) {
-	pred <- get.tfr.prediction(sim.dir)
+tfr.median.shift <- function(sim.dir, country, reset=FALSE, shift=0, from=NULL, to=NULL) {
+	invisible(.bdem.median.shift(type='tfr', sim.dir=sim.dir, country=country, reset=reset, 
+				shift=shift, from=from, to=to))
+}
+
+.bdem.median.set <- function(type, sim.dir, country, values, years=NULL) {
+	pred <- do.call(paste('get.', type, '.prediction', sep=''), list(sim.dir))
 	meta <- pred$mcmc.set$meta
 	country.obj <- get.country.object(country, meta=meta)
 	if(is.null(country.obj$name)) stop('Country not found.')
-	tfr.shift <- get.tfr.shift(country.obj$code, pred)
+	bdem.shift <- do.call(paste('get.', type, '.shift', sep=''), list(country.obj$code, pred))
 	pred.years <- as.numeric(dimnames(pred$quantiles)[[3]])
 	nr.proj <- pred$nr.projections+1 
 	if(is.null(years)) years <- pred.years[2:nr.proj]
@@ -698,12 +763,21 @@ tfr.median.set <- function(sim.dir, country, values, years=NULL) {
 		start <- which(cumsum(which.years)==lvalues)[1]+1
 		which.years[start:nr.proj] <- FALSE
 	}
-	if(is.null(tfr.shift)) tfr.shift <- rep(0, nr.proj)
+	if(is.null(bdem.shift)) bdem.shift <- rep(0, nr.proj)
 	medians <- pred$quantiles[country.obj$index, '0.5',]
-	tfr.shift[which.years] <- values - medians[which.years]
-	if(sum(tfr.shift) == 0) tfr.shift <- NULL
-	pred$median.shift[[as.character(country.obj$code)]] <- tfr.shift
-	store.bayesTFR.prediction(pred)
+	bdem.shift[which.years] <- values - medians[which.years]
+	if(sum(bdem.shift) == 0) bdem.shift <- NULL
+	pred$median.shift[[as.character(country.obj$code)]] <- bdem.shift
+	do.call(paste('store.', class(pred), sep=''), list(pred))
 	cat('\nMedian of', country.obj$name, 'modified for years', pred.years[which.years], '\n')
-	invisible(pred)
+	return(pred)
 }
+
+tfr.median.set <- function(sim.dir, country, values, years=NULL) {
+	invisible(.bdem.median.set(type='tfr', sim.dir=sim.dir, country=country, values=values, years=years))
+}
+
+"get.data.imputed" <- function(pred, ...) UseMethod("get.data.imputed")
+
+get.data.imputed.bayesTFR.prediction <- function(pred, ...)
+	return(get.tfr.reconstructed(pred$tfr_matrix_reconstructed, pred$mcmc.set$meta))

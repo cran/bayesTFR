@@ -181,7 +181,6 @@ tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample
 	nr_simu <- iter
 	if (is.null(iter))
     	nr_simu <- mcmc$length
-   	nr_countries.not.update <- mcmc$meta$nr_countries - length(countries)
     nr_countries_all <- mcmc$meta$nr_countries
     nr_countries <- length(countries)
     Triangle_c4.low <- mcmc$meta$Triangle_c4.low
@@ -200,13 +199,14 @@ tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample
     hyperparameter.names <- tfr.parameter.names(trans=FALSE)
     hyperparameters <- list()
     sampled.index <- sample(posterior.sample, nr_simu, replace=TRUE)
+    th.burnin <- get.thinned.burnin(mcmc, burnin)
     for (par in hyperparameter.names) {
     	hyperparameters[[par]] <- c()
     	for(mc in mcmc.list) {
-    		if (no.traces.loaded(mc)  || burnin < mc$traces.burnin) {
-    			traces <- do.get.traces(mc, par, burnin=burnin)
+    		if (no.traces.loaded(mc)  || th.burnin < mc$traces.burnin) {
+    			traces <- bdem.parameter.traces(mc, par, burnin=th.burnin)
         	} else {
-          		traces <- get.burned.tfr.traces(mc, par, burnin)
+          		traces <- get.burned.tfr.traces(mc, par, th.burnin)
        		}
        		hyperparameters[[par]] <- rbind(hyperparameters[[par]], traces)
        	}

@@ -1,7 +1,7 @@
 \name{tfr.predict.extra}
 \Rdversion{1.1}
 \alias{tfr.predict.extra}
-\docType{data}
+
 \title{
 Generating Posterior Trajectories of the Total Fertility Rate for Specific Countries or Regions
 }

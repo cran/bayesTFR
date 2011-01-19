@@ -34,24 +34,16 @@ tfr.partraces.cs.plot(country, mcmc.list = NULL,
   \item{\dots}{Additional graphical arguments.}
 }
 \details{
-The functions plot MCMC traces either for country-independent parameters (\code{tfr.partraces.plot}) or for country-specific parameters (\code{tfr.partraces.cs.plot}), one graph per parameter.  One can restrict it to specific chains by setting the \code{chain.ids} argument and to specific parameters by setting the \code{par.names} argument.
+The functions plot MCMC traces either for country-independent parameters (\code{tfr.partraces.plot}) or for country-specific parameters (\code{tfr.partraces.cs.plot}), one graph per parameter.  One can restrict it to specific chains by setting the \code{chain.ids} argument, and to specific parameters by setting the \code{par.names} argument.
 }
 
-%\references{
-%% ~put references to the literature/web site here ~
-%}
 \author{
 Hana Sevcikova
 }
-%\note{
-%%  ~~further notes~~
-%}
 
-%% ~Make other sections like Warning with \section{Warning }{....} ~
-
-%\seealso{
-%% ~~objects to See Also as \code{\link{help}}, ~~~
-%}
+\seealso{
+\code{\link{coda.mcmc.list}} for retrieving the raw values of traces.
+}
 \examples{
 \dontrun{
 sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')

@@ -36,17 +36,10 @@ tfr.mcmc.list(mcmc.set, chain.ids=NULL)
 \value{
 \code{get.tfr.mcmc} returns an object of class \code{\link{bayesTFR.mcmc.set}}. \code{has.tfr.mcmc} returns a logical value. \code{tfr.mcmc} returns an object of class \code{\link{bayesTFR.mcmc}}, and \code{tfr.mcmc.list} returns a list of \code{\link{bayesTFR.mcmc}} objects.
 }
-%\references{
-%% ~put references to the literature/web site here ~
-%}
+
 \author{
 Hana Sevcikova
 }
-%\note{
-%%  ~~further notes~~
-%}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
 
 \seealso{
 \code{\link{bayesTFR.mcmc.set}}

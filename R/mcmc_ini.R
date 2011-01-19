@@ -40,27 +40,32 @@ get_eps_T_all <- function (mcmc) {
     return(eps_Tc)
 }
 
+find.lambda.for.one.country <- function(tfr, T_end) {
+	lambda <- T_end
+	if ( sum(tfr<2, na.rm=TRUE)>2 ){
+		period = 3
+		while (period<=T_end){
+			if (( (tfr[period] - tfr[period-1]) >0 )& 
+                    ( (tfr[period-1] - tfr[period-2]) >0) & 
+                    (prod(tfr[(period-2):period]<2)==1) 
+             	) {
+				lambda = period-1
+				period = T_end+1
+			} else { 
+				period = period +1
+            }
+         }
+	}
+	return(lambda)
+}
 
 get.lambda <- function(tfr_matrix, T_end_c){
 	# find lambda_c's based on definition
 	# tfr increased twice, below 2
     nr_countries = length(tfr_matrix[1,])
-	lambda_c = T_end_c
-    for (country in 1:nr_countries){
-		tfr =  tfr_matrix[, country]
-		if ( sum(tfr<2, na.rm=TRUE)>2 ){
-			period = 3
-			while (period<=T_end_c[country]){
-				if (( (tfr[period] - tfr[period-1]) >0 )& 
-                                        ( (tfr[period-1] - tfr[period-2]) >0) & 
-                                        (prod(tfr[(period-2):period]<2)==1) 
-                    ) {
-					lambda_c[country] = period-1
-					period = T_end_c[country]+1
-				} else { 
-					period = period +1
-                }
-     }}}
+    lambda_c <- T_end_c
+    for (country in 1:nr_countries)
+    	lambda_c[country] <- find.lambda.for.one.country(tfr_matrix[, country], T_end_c[country])
 	return(lambda_c)
 }
 
@@ -293,7 +298,7 @@ mcmc.ini <- function(chain.id, mcmc.meta, iter=100,
     }
    	dontsave.pars <- c('add_to_sd_Tc', 'meta')
     if (!save.all.parameters) dontsave.pars <- c(dontsave.pars, 'eps_Tc')
-    	    	
+    if (!exists(".Random.seed")) runif(1)	    	
 	mcmc <- structure(list(
                         U_c=U_c, d_c=d_c, gamma_ci=gamma_ci, 
                         Triangle_c4 = Triangle_c4,

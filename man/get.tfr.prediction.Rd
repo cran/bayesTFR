@@ -7,7 +7,7 @@
 Accessing a Prediction Object
 }
 \description{
-The function retrieves results of a prediction and creates an object of class \code{\link{bayesTFR.prediction}}.
+Function \code{get.tfr.prediction} retrieves results of a prediction and creates an object of class \code{\link{bayesTFR.prediction}}. Function \code{has.tfr.prediction} checks an existence of such results.
 }
 \usage{
 get.tfr.prediction(mcmc = NULL, sim.dir = NULL, mcmc.dir = NULL)
@@ -16,7 +16,7 @@ has.tfr.prediction(mcmc = NULL, sim.dir = NULL)
 }
 
 \arguments{
-  \item{mcmc}{Object of class \code{\link{bayesTFR.mcmc.set}} used to make the prediction.  If it is \code{NULL}, the prediction is loaded from directory given by \code{dir}.}
+  \item{mcmc}{Object of class \code{\link{bayesTFR.mcmc.set}} used to make the prediction.  If it is \code{NULL}, the prediction is loaded from directory given by \code{sim.dir}.}
   \item{sim.dir}{Directory where the prediction is stored.  It should correspond to the value of the \code{output.dir} argument used in the \code{\link{tfr.predict}} function.  Only relevant if \code{mcmc} is \code{NULL}.}
   \item{mcmc.dir}{Optional argument to be used only in a special case when the mcmc object contained in the prediction object was estimated in different directory than in the one to which it points to (for example due to moving or renaming the original directory). The argument causes that the mcmc is redirected to the given directory.}
 }
@@ -29,18 +29,10 @@ If \code{mcmc} is not \code{NULL}, the search directory is set to \code{mcmc$met
 	Function \code{get.tfr.prediction} returns an
 object of class \code{\link{bayesTFR.prediction}}.
 }
-%\references{
-%% ~put references to the literature/web site here ~
-%}
+
 \author{
 Hana Sevcikova
 }
-%\note{
-%%  ~~further notes~~
-%}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
-
 \seealso{
 \code{\link{bayesTFR.prediction}}, \code{\link{tfr.predict}}, \code{\link{summary.bayesTFR.prediction}}
 }

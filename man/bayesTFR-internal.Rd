@@ -2,6 +2,7 @@
 \Rdversion{1.1}
 
 \alias{burn.and.thin} 
+\alias{bdem.parameter.traces}
 \alias{diag.thin.indep} 
 \alias{DLcurve}
 \alias{do.convert.trajectories}
@@ -22,6 +23,10 @@
 \alias{get.all.parameter.names.extended} 
 \alias{get.ar1.parameters}
 \alias{get.burned.tfr.traces}
+\alias{get.countries.index}
+\alias{get.data.imputed}
+\alias{get.data.matrix}
+\alias{get.friendly.variant.names}
 \alias{get.full.par.names}
 \alias{get.full.par.names.cs}
 \alias{get.half.child.variant}
@@ -34,21 +39,27 @@
 \alias{get.median.from.prediction}
 \alias{get.meta.only}
 \alias{get.newTFRcolnames}
+\alias{get.nr.countries}
+\alias{get.nr.countries.est}
 \alias{get.observed.time.matrix.and.regions}
 \alias{get.other.parameter.names} 
 \alias{get.other.parameter.names.cs}
 \alias{get.prediction.periods}
 \alias{get.prediction.years}
+\alias{get.projection.summary.header}
 \alias{get.TFRmatrix.and.regions}
 \alias{get.tfr.reconstructed}
+\alias{get.tfr.shift}
 \alias{get.thinned.burnin}
 \alias{get.thinning.index}
 \alias{get.totrans.parameter.names} 
 \alias{get.totrans.parameter.names.cs}
+\alias{get.traj.ascii.header}
+\alias{get.traj.quantiles}
 \alias{get.trans.parameter.names}
 \alias{get.trans.parameter.names.cs}
-\alias{get.traj.quantiles}
 \alias{get.trajectories}
+\alias{get.UN.variant.names}
 \alias{get_eps_T}
 \alias{get_eps_T_all}
 \alias{ini.tfr.with.DL}

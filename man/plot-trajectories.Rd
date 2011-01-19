@@ -45,11 +45,6 @@ The median and given probability intervals are computed using all available traj
 \author{
 Hana Sevcikova, Leontine Alkema
 }
-%\note{
-%%  ~~further notes~~
-%}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
 
 \seealso{
 \code{\link{bayesTFR.prediction}}
@@ -57,7 +52,7 @@ Hana Sevcikova, Leontine Alkema
 \examples{
 \dontrun{
 sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')
-pred <- get.tfr.prediciton(sim.dir)
+pred <- get.tfr.prediction(sim.dir)
 tfr.trajectories.plot(pred, country='Burkina Faso', pi=c(80, 95))
 tfr.trajectories.table(pred, country='Burkina Faso', pi=c(80, 95))
 }

@@ -1,18 +1,18 @@
 
 test.load.UNtfr <- function(wpp.year=2008) {
 	# read the UN TFR input file
-	tfr <- read.UNtfr(wpp.year)
-	stopifnot(length(dim(tfr$tfr_data))==2)
-	stopifnot(dim(tfr$tfr_data)[1] > 150)
-	stopifnot(is.element('last.observed', colnames(tfr$tfr_data)))
+	tfr <- bayesTFR:::read.UNtfr(wpp.year)
+	stopifnot(length(dim(tfr$data))==2)
+	stopifnot(dim(tfr$data)[1] > 150)
+	stopifnot(is.element('last.observed', colnames(tfr$data)))
 	stopifnot(length(tfr$replaced) == 0)
 	stopifnot(length(tfr$added) == 0)
 	cat('\n===> Test of loading UN TFR file OK.\n')
 }
 
 test.load.UNlocations <- function(wpp.year=2008) {
-	tfr <- read.UNtfr(wpp.year)
-	locs <- read.UNlocations(tfr$tfr_data, wpp.year)
+	tfr <- bayesTFR:::read.UNtfr(wpp.year)
+	locs <- bayesTFR:::read.UNlocations(tfr$data, wpp.year)
 	stopifnot(length(dim(locs$loc_data)) == 2)
 	stopifnot(all(is.element(c('country_code', 'include_code'), colnames(locs$loc_data))))
 	stopifnot(dim(locs$loc_data)[1] > 200)
@@ -21,9 +21,9 @@ test.load.UNlocations <- function(wpp.year=2008) {
 }
 
 test.create.tfr.matrix <- function(wpp.year=2008) {
-	tfr <- read.UNtfr(wpp.year)
-	locs <- read.UNlocations(tfr$tfr_data, wpp.year)
-	tfr.and.regions <- get.TFRmatrix.and.regions(tfr$tfr_data, locs$loc_data, 
+	tfr <- bayesTFR:::read.UNtfr(wpp.year)
+	locs <- bayesTFR:::read.UNlocations(tfr$data, wpp.year)
+	tfr.and.regions <- bayesTFR:::get.TFRmatrix.and.regions(tfr$data, locs$loc_data, 
 												present.year=2009)
 	tfr.matrix <- tfr.and.regions$tfr_matrix
 	stopifnot(dim(tfr.matrix)[1] == 12)
@@ -169,7 +169,7 @@ test.existing.simulation <- function() {
 	sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')
 	m <- get.tfr.mcmc(sim.dir, low.memory=FALSE, burnin=25, chain.ids=c(1,2))
 	stopifnot(length(m$mcmc.list)==2)
-	stopifnot(dim(m$mcmc_list[[1]]$traces)[1]==25)
+	stopifnot(dim(m$mcmc.list[[1]]$traces)[1]==25)
 	cat('\n===> Test of retrieving MCMC results OK.\n')
 }
 
@@ -197,6 +197,9 @@ test.TFRtrajectories <- function() {
 	unlink(filename)
 	stopifnot(size > 0)
 	cat('\n===> Test of plotting TFR trajectories OK.\n')
+	t <- tfr.trajectories.table(pred, 'Australia', pi=c(90, 80, 70))
+	stopifnot(all(dim(t) == c(30, 9)))
+	cat('\n===> Test of tabulating TFR trajectories OK.\n')
 }
 
 test.plot.density <- function() {
@@ -216,8 +219,7 @@ test.plot.map <- function() {
 	sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')
 	pred <- get.tfr.prediction(sim.dir=sim.dir)
 	filename <- tempfile()
-	png(filename=filename)
-	tfr.map(pred, projection.year=2043)
+	tfr.map(pred, projection.year=2043, device='png', device.args=list(filename=filename))
 	dev.off()
 	size <- file.info(filename)['size']
 	unlink(filename)
