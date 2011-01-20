@@ -110,10 +110,10 @@ tfr.trajectories.table <- function(tfr.pred, country, pi=c(80, 95), half.child.v
 	}
 	country <- get.country.object(country, tfr.pred$mcmc.set$meta)
 	l <- tfr.pred$nr.projections
-	tfr_matrix_reconstructed <- get.tfr.reconstructed(tfr.pred$tfr_matrix_reconstructed, tfr.pred$mcmc.set$meta)
-	x1 <- as.integer(rownames(tfr_matrix_reconstructed))
+	data.matrix <- get.data.imputed(tfr.pred)
+	x1 <- as.integer(rownames(data.matrix))
 	x2 <- seq(max(x1)+5, by=5, length=l)
-	tfr <- as.matrix(tfr_matrix_reconstructed[,country$index], ncol=1)
+	tfr <- as.matrix(data.matrix[,country$index], ncol=1)
 	rownames(tfr) <- x1
 	pred.table <- matrix(NA, ncol=2*length(pi)+1, nrow=l)
 	pred.table[,1] <- get.median.from.prediction(tfr.pred, country$index, country$code)[2:(l+1)]
@@ -313,7 +313,7 @@ tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95),
 }
 
 extract.plot.args <- function(...) {
-	# split '...' into plot arguments and teh rest
+	# split '...' into plot arguments and the rest
 	all.plot.args <- names(formals(plot.default))
 	args <- list(...)
 	which.plot.args <- pmatch(names(args), all.plot.args)
@@ -332,6 +332,7 @@ do.plot.tfr.partraces <- function(mcmc.list, func, par.names, main.postfix='', c
 		}
 	pars <- list()
 	iter <- rep(NA, nr.chains)
+	mclen <- rep(0, nr.chains)
 	
 	# split '...' into function arguments and plot arguments
 	split.args <- extract.plot.args(...)
@@ -340,12 +341,27 @@ do.plot.tfr.partraces <- function(mcmc.list, func, par.names, main.postfix='', c
 	thin <- fun.args$thin
 	fun.args$thin <- NULL
 	if(is.null(fun.args$burnin)) fun.args$burnin <- 0
-
+	orig.burnin <- fun.args$burnin
 	i <- 1
 	for(chain in chain.ids) {
 		mcmc <- mcmc.list[[chain]]
-		if (!is.null(thin)) 
-			fun.args$thinning.index <- seq(1, mcmc$finished.iter-fun.args$burnin, by=thin)
+		if (!is.null(thin) || mcmc$thin > 1) {
+			consolidated.burn.thin <- burn.and.thin(mcmc, orig.burnin, 
+										if (is.null(thin)) mcmc$thin else thin)
+			fun.args$burnin <- consolidated.burn.thin$burnin
+			if (!is.null(consolidated.burn.thin$index)) fun.args$thinning.index <- consolidated.burn.thin$index
+			else {
+				if(!is.null(thin)) {
+					thin <- max(thin, mcmc$thin)
+					fun.args$thinning.index <- unique(round(seq(1,mcmc$length-consolidated.burn.thin$burnin, 
+												by=thin/mcmc$thin)))
+				} else  {
+						fun.args$thinning.index <- seq(1,mcmc$length-consolidated.burn.thin$burnin)
+						mclen[i] <- length(fun.args$thinning.index)
+					}
+			}
+			
+		}
 		pars[[i]] <- eval(do.call(func, c(list(mcmc, par.names=par.names), fun.args)))
 		pars[[i]] <- filter.traces(pars[[i]], par.names)
 		iter[i] <- mcmc$finished.iter
@@ -373,15 +389,18 @@ do.plot.tfr.partraces <- function(mcmc.list, func, par.names, main.postfix='', c
 	par(mfrow=c(nrows,ncols))
 	col <- 1:nr.chains
 	maxx<-max(iter)
-	if(is.null(plot.args$xlim)) plot.args$xlim <- c(1+fun.args$burnin,maxx)
+	if(is.null(plot.args$xlim)) plot.args$xlim <- c(1+orig.burnin,maxx)
 	if(is.null(plot.args$xlab)) plot.args$xlab <- 'iterations'
 	if(is.null(plot.args$ylab)) plot.args$ylab <- ''
 	ylim <- plot.args$ylim
 	ipara <- 1
 	for (para in colnames(pars[[1]])) {
 		#mx <- length(pars[[1]][,para])
-		xindex <- if (is.null(thin)) (1+fun.args$burnin):maxx 
-					else xindex <- seq(1+fun.args$burnin, maxx, by=thin)
+		if (is.null(thin)) {
+			maxmclen <- max(mclen)
+			xindex <- if(maxmclen > 0) seq(1+orig.burnin, maxx, length=maxmclen)
+						else (1+orig.burnin):maxx 
+		} else xindex <- seq(1+orig.burnin, maxx, by=thin)
 		thinpoints <- get.thinning.index(nr.points, length(xindex))
 		ltype='l'
 		if (thinpoints$nr.points > 0) {
@@ -491,29 +510,41 @@ tfr.pardensity.cs.plot <- function(country, mcmc.list=NULL, sim.dir=file.path(ge
 							burnin=burnin, dev.ncol=dev.ncol, ...)
 }
 
+".get.gamma.pars" <- function(pred, ...) UseMethod (".get.gamma.pars")
+.get.gamma.pars.bayesTFR.prediction <- function(pred, ...) {
+	# estimated by
+	# library(MASS)
+	# data <- pred$tfr_matrix_reconstructed[12,]
+	# gd <- fitdistr(data-min(data)+0.05, densfun='gamma')
+	# min(data) is 0.95
+	return(list(gamma.pars=list(shape=1.87, rate=0.94), gamma.shift=0.95-0.05, min.value=0.7,
+					max.value=NULL))
+}
 
-get.tfr.map.parameters <- function(tfr.pred, tfr.range=NULL, nr.cats=50, same.scale=TRUE, 
+get.tfr.map.parameters <- function(pred, tfr.range=NULL, nr.cats=50, same.scale=TRUE, 
 						quantile=0.5, ...) {
-	map.pars <- list(tfr.pred=tfr.pred, quantile=quantile, ...)
+	map.pars <- list(pred=pred, quantile=quantile, ...)
 	if (same.scale) {
-		# estimated by
-		# library(MASS)
-		# data <- pred$tfr_matrix_reconstructed[12,]
-		# gd <- fitdistr(data-min(data)+0.05, densfun='gamma')
-		# min(data) is 0.95
-		gamma.pars <- list(shape=1.87, rate=0.94)
-		gamma.shift <- 0.95 - 0.05
-		data <- tfr.pred$quantiles[,as.character(quantile),1]
-		q <- if(is.null(tfr.range)) c(min(pmax(data,gamma.shift)), max(data))-gamma.shift
-			 else c(max(gamma.shift, tfr.range[1]-gamma.shift), max(gamma.shift, tfr.range[2]-gamma.shift))
-		min.max.q <- pgamma(q, shape=gamma.pars[['shape']], rate=gamma.pars[['rate']])
+		gp <- .get.gamma.pars(pred)
+		data <- pred$quantiles[,as.character(quantile),1]
+		q <- if(is.null(tfr.range)) c(min(pmax(data,gp$gamma.shift)), max(data))-gp$gamma.shift
+			 else c(max(gp$gamma.shift, tfr.range[1]-gp$gamma.shift), max(gp$gamma.shift, tfr.range[2]-gp$gamma.shift))
+		min.max.q <- pgamma(q, shape=gp$gamma.pars[['shape']], rate=gp$gamma.pars[['rate']])
 		quantiles <- seq(min.max.q[1], min.max.q[2], length=nr.cats)
-		quant.values <- c(0.7, qgamma(quantiles, shape=gamma.pars[['shape']], rate=gamma.pars[['rate']])+gamma.shift)
+		quant.values <- c(gp$min.value, 
+				qgamma(quantiles, shape=gp$gamma.pars[['shape']], rate=gp$gamma.pars[['rate']])+gp$gamma.shift)
+		if(!is.null(gp$max.value) && gp$max.value > max(quant.values)) quant.values <- c(quant.values, gp$max.value)
+
 		if(!is.null(tfr.range)) {
 			if(tfr.range[1] < quant.values[1])
 				quant.values <- c(tfr.range[1], quant.values)
 			if(tfr.range[1] > quant.values[1])
 				quant.values <- quant.values[quant.values >= tfr.range[1]]
+			last <- length(quant.values)
+			if(tfr.range[2] > quant.values[last])
+				quant.values <- c(quant.values, tfr.range[2])
+			if(tfr.range[2] < quant.values[last])
+				quant.values <- quant.values[quant.values <= tfr.range[2]]
 		}
 		col <- rainbow(500, start=0, end=0.67)[seq(500, 1, length=length(quant.values)-1)]
 		map.pars$catMethod <- quant.values
@@ -525,10 +556,10 @@ get.tfr.map.parameters <- function(tfr.pred, tfr.range=NULL, nr.cats=50, same.sc
 	return(map.pars)		
 }
 
-tfr.map.all <- function(tfr.pred, output.dir, output.type='png', tfr.range=NULL, nr.cats=50, same.scale=TRUE, 
-						quantile=0.5, ...) {
+bdem.map.all <- function(pred, output.dir, type='tfr', output.type='png', range=NULL, nr.cats=50, same.scale=TRUE, 
+						quantile=0.5, file.prefix='TFRwrldmap_', ...) {
 	if(!file.exists(output.dir)) dir.create(output.dir, recursive=TRUE)
-	all.years <- dimnames(tfr.pred$quantiles)[[3]]
+	all.years <- dimnames(pred$quantiles)[[3]]
 	output.args <- list()
 	postfix <- output.type
 	if(output.type=='postscript') postfix <- 'ps'
@@ -536,36 +567,48 @@ tfr.map.all <- function(tfr.pred, output.dir, output.type='png', tfr.range=NULL,
 	if(output.type=='postscript' || output.type=='pdf') {filename.arg<-'file'}
 	else{output.args[['width']] <- 1000}
 	
-	map.pars <- get.tfr.map.parameters(tfr.pred, tfr.range=tfr.range, nr.cats=nr.cats, same.scale=same.scale,
+	map.pars <- get.tfr.map.parameters(pred, tfr.range=range, nr.cats=nr.cats, same.scale=same.scale,
 					quantile=quantile, ...)
 	
 	for (year in all.years) {
 		output.args[[filename.arg]] <- file.path(output.dir, 
-										paste('TFRwrldmap_', year, '.', postfix, sep=''))
-		do.call('tfr.map', c(list(projection.year=year, device=output.type, device.args=output.args), map.pars))
+										paste(file.prefix, year, '.', postfix, sep=''))
+		do.call(paste(type, '.map', sep=''), c(list(projection.year=year, device=output.type, 
+							device.args=output.args), map.pars))
 		dev.off()
 	}
 	cat('Maps written into', output.dir, '\n')
 }
 
-tfr.map <- function(tfr.pred, quantile=0.5, projection.year=NULL, projection.index=1,  device='dev.new', 
+tfr.map.all <- function(pred, output.dir, output.type='png', tfr.range=NULL, nr.cats=50, same.scale=TRUE, 
+						quantile=0.5, file.prefix='TFRwrldmap_', ...) {
+	bdem.map.all(pred=pred, output.dir=output.dir, type='tfr', output.type=output.type, range=tfr.range,
+						nr.cats=nr.cats, same.scale=same.scale, quantile=quantile, file.prefix=file.prefix, ...)
+}
+
+".map.main.default" <- function(pred, ...) UseMethod (".map.main.default")
+
+.map.main.default.bayesTFR.prediction <- function(pred, ...) return('TFR: quantile')
+	
+tfr.map <- function(pred, quantile=0.5, projection.year=NULL, projection.index=1,  device='dev.new', 
 						main=NULL, device.args=NULL, ...
 				) {
 	require(rworldmap)
-	years <- dimnames(tfr.pred$quantiles)[[3]]
+	years <- dimnames(pred$quantiles)[[3]]
 	if(!is.null(projection.year)) {
 		projection.index <- (1:length(years))[is.element(years, as.character(projection.year))]
 		if(length(projection.index) == 0) stop('Projection year ', projection.year, ' not found.\nAvailable: ', 
 												paste(years, collapse=', '))
 	}
-	if(!is.element(as.character(quantile), dimnames(tfr.pred$quantiles)[[2]]))
-		stop('Quantile ', quantile, ' not found.\nAvailable: ', paste(dimnames(tfr.pred$quantiles)[[2]], collapse=', '))
-	tfr <- data.frame(cbind(un=tfr.pred$mcmc.set$meta$regions$country_code, 
-							tfr=tfr.pred$quantiles[, as.character(quantile),projection.index]))
+	if(!is.element(as.character(quantile), dimnames(pred$quantiles)[[2]]))
+		stop('Quantile ', quantile, ' not found.\nAvailable: ', paste(dimnames(pred$quantiles)[[2]], collapse=', '))
+	tfr <- data.frame(cbind(un=pred$mcmc.set$meta$regions$country_code, 
+							tfr=pred$quantiles[, as.character(quantile),projection.index]))
 	mtfr <- joinCountryData2Map(tfr, joinCode='UN', nameJoinColumn='un')
-	if(is.null(main)) main <- paste(years[projection.index], 'TFR: quantile', quantile)
+	if(is.null(main)) main <- paste(years[projection.index], .map.main.default(pred), quantile)
 	if (device != 'dev.cur')
 		do.call('mapDevice', c(list(device=device), device.args))
-	mapParams<-mapCountryData(mtfr, nameColumnToPlot='tfr', addLegend=FALSE, mapTitle=main, ...)
+	mapParams<-mapCountryData(mtfr, nameColumnToPlot='tfr', addLegend=FALSE, mapTitle=main, ...
+	)
 	do.call(addMapLegend, c(mapParams, legendWidth=0.5, legendMar=2, legendLabels='all'))
 }

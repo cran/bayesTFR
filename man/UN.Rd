@@ -48,9 +48,9 @@ Optionally, the data set can contain a column called \code{last.observed} contai
 
 The package contains also a data set called \sQuote{my_tfr_template} which is a template for user-specified TFR time series. It has the same structure, except that it can contain any subset of the set of the columns above. The only required column is \code{country_code} (see description of the argument \code{my.tfr.file} in \code{\link{run.tfr.mcmc}}).
 }
-%\source{
-%%  ~~ reference to a publication or URL from which the data were obtained ~~
-%}
+\source{
+Data provided by the United Nations Population Division
+}
 %\references{
 %%  ~~ possibly secondary sources and usages ~~
 %}

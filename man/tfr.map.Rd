@@ -10,23 +10,23 @@ TFR World Map
 Generates a world map of the total fertility rate for given projection period and quantile.
 }
 \usage{
-tfr.map(tfr.pred, quantile = 0.5, 
+tfr.map(pred, quantile = 0.5, 
     projection.year = NULL, projection.index = 1, 
-    device = "dev.new", main = NULL, device.args = NULL, ...)
+    device = "dev.new", main = NULL, device.args = NULL, \dots)
 	
-tfr.map.all(tfr.pred, output.dir, output.type = "png", 
+tfr.map.all(pred, output.dir, output.type = "png", 
     tfr.range = NULL, nr.cats = 50, same.scale = TRUE, 
-    quantile = 0.5, ...)
+    quantile = 0.5, file.prefix='TFRwrldmap_', \dots)
 			
-get.tfr.map.parameters(tfr.pred, tfr.range = NULL, 
-    nr.cats = 50, same.scale = TRUE, quantile = 0.5, ...)
+get.tfr.map.parameters(pred, tfr.range = NULL, 
+    nr.cats = 50, same.scale = TRUE, quantile = 0.5, \dots)
 }
 
 \arguments{
-  \item{tfr.pred}{Object of class \code{\link{bayesTFR.prediction}}.}
-  \item{quantile}{Quantile for which the map should be generated. It must be equal to one of the values in \code{dimnames(tfr.pred$quantiles[[2]])}, i.e. 0, 0.025, 0.05, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 0.95, 0.975, 1. Value 0.5 corresponds to the median.}
-  \item{projection.year}{Middle year of the projection period, i.e. period lower bound plus 3. It must correspond to one of the values of \code{dimnames(tfr.pred$quantiles[[3]])}. If it is not given, \code{projection.index} determines the projection year.}
-  \item{projection.index}{Index of the projection to be displayed. It is only relevant if \code{projection.year} is \code{NULL}. In such a case the projection year is \cr \code{dimnames(tfr.pred$quantiles[[3]])[projection.index]}.
+  \item{pred}{Object of class \code{\link{bayesTFR.prediction}}.}
+  \item{quantile}{Quantile for which the map should be generated. It must be equal to one of the values in \code{dimnames(pred$quantiles[[2]])}, i.e. 0, 0.025, 0.05, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 0.95, 0.975, 1. Value 0.5 corresponds to the median.}
+  \item{projection.year}{Middle year of the projection period, i.e. period lower bound plus 3. It must correspond to one of the values of \code{dimnames(pred$quantiles[[3]])}. If it is not given, \code{projection.index} determines the projection year.}
+  \item{projection.index}{Index of the projection to be displayed. It is only relevant if \code{projection.year} is \code{NULL}. In such a case the projection year is \cr \code{dimnames(pred$quantiles[[3]])[projection.index]}.
 }
   \item{device}{Device for displaying the map. It is passed to the \code{\link[rworldmap]{mapDevice}} function of the \pkg{rworldmap} package. If it is equal to \sQuote{dev.cur}, the current device is used. Otherwise, it can be \sQuote{dev.new}, \sQuote{png}, \sQuote{pdf} etc.
 }
@@ -42,6 +42,7 @@ additional arguments to be passed to the \code{\link[rworldmap]{mapDevice}} func
  By default, the whole range is considered. Note that countries with values outside of the given range will appear white.}
   \item{nr.cats}{Number of color categories.}
   \item{same.scale}{Logical controlling if maps for all projection years of this prediction object should be on the same color scale.}
+    \item{file.prefix}{Prefix for file names.}
   \item{\dots}{
 Arguments passed to the \code{\link[rworldmap]{mapCountryData}} function of the \pkg{rworldmap} package.
 }
@@ -53,7 +54,7 @@ Function \code{get.tfr.map.parameters} can be used in combination with \code{tfr
 }
 \value{
 \code{get.tfr.map.parameters} returns a list with elements:
-  \item{tfr.pred}{The object of class \code{\link{bayesTFR.prediction}} used in the function.}
+  \item{pred}{The object of class \code{\link{bayesTFR.prediction}} used in the function.}
   \item{quantile}{Value of the argument \code{quantile}.}
   \item{catMethod}{If the argument \code{same.scale} is \code{TRUE}, this element contains breakpoints for categorization. It is generated from a fitted gamma distribution. Otherwise, it is \code{NULL}.}
   \item{numCats}{Number of categories.}

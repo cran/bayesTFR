@@ -21,9 +21,9 @@ Dataset used by the UN for coding time. It is an TAB-separated ASCII file called
 \details{
 For 5-year period data, fertility rates are defined from 1 July of year (t) to 1 July of year (t+5), with 1 January of year (t+3) as exact mid-date. This means for example that data for 2000-2005, refer to the period between 2000.5 and 2005.5, with 2003.0 as exact mid-point.
 }
-%\source{
-%%  ~~ reference to a publication or URL from which the data were obtained ~~
-%}
+\source{
+Data provided by the United Nations Population Division
+}
 %\references{
 %%  ~~ possibly secondary sources and usages ~~
 %}

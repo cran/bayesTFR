@@ -27,8 +27,9 @@ get.tfr.mcmc <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'), chain.id
 		load(file=file.path(sim.dir, mc.dirs.short[counter], 'bayesTFR.mcmc.rda'))
 		bayesTFR.mcmc$meta <- bayesTFR.mcmc.meta
 		if (!low.memory) { # load full mcmc traces
-			bayesTFR.mcmc$traces <- load.tfr.parameter.traces.all(bayesTFR.mcmc, burnin=burnin)
-			bayesTFR.mcmc$traces.burnin <- get.thinned.burnin(bayesTFR.mcmc, burnin)
+			th.burnin <- get.thinned.burnin(bayesTFR.mcmc, burnin)
+			bayesTFR.mcmc$traces <- load.tfr.parameter.traces.all(bayesTFR.mcmc, burnin=th.burnin)
+			bayesTFR.mcmc$traces.burnin <- th.burnin
 		} else { # traces will be loaded as they are needed
 			bayesTFR.mcmc$traces <- 0
 			bayesTFR.mcmc$traces.burnin <- 0
@@ -61,12 +62,14 @@ get.thinned.tfr.mcmc <- function(mcmc.set, thin=1, burnin=0) {
 	return(NULL)
 }
 	
-create.thinned.tfr.mcmc <- function(mcmc.set, thin=1, burnin=0, verbose=TRUE) {
+create.thinned.tfr.mcmc <- function(mcmc.set, thin=1, burnin=0, output.dir=NULL, verbose=TRUE) {
 	#Return a thinned mcmc.set object with burnin removed and all chanins collapsed into one
 	mcthin <- max(sapply(mcmc.set$mcmc.list, function(x) x$thin))
 	thin <- max(c(thin, mcthin))
 	meta <- mcmc.set$meta
-	meta$output.dir <- file.path(meta$output.dir, paste('thinned_mcmc', thin, burnin, sep='_'))
+	meta$output.dir <- file.path(
+			if(is.null(output.dir)) meta$output.dir else output.dir, 
+			paste('thinned_mcmc', thin, burnin, sep='_'))
 	if(!file.exists(meta$output.dir)) 
 		dir.create(meta$output.dir, recursive=TRUE)
 	total.iter <- get.stored.mcmc.length(mcmc.set$mcmc.list, burnin=burnin)
@@ -181,16 +184,21 @@ get.tfr.prediction <- function(mcmc=NULL, sim.dir=NULL, mcmc.dir=NULL) {
 	pred <- bayesTFR.prediction
 	# re-route mcmcs if necessary
 	if(!is.null(mcmc.dir) || !has.tfr.mcmc(pred$mcmc.set$meta$output.dir)) {
-		est.dir <- if(is.null(mcmc.dir)) sim.dir else mcmc.dir
-		pred$mcmc.set <- get.tfr.mcmc(est.dir)
+		new.path <- file.path(sim.dir, basename(pred$mcmc.set$meta$output.dir))
+		if (has.tfr.mcmc(new.path)) pred$mcmc.set <- get.tfr.mcmc(new.path)
+		else {
+			est.dir <- if(is.null(mcmc.dir)) sim.dir else mcmc.dir
+			pred$mcmc.set <- get.tfr.mcmc(est.dir)
+		}
 	}
 	return(pred)
 }
 
-get.tfr.convergence.all <- function(sim.dir=file.path(getwd(), 'bayesTFR.output')) {
+.do.get.convergence.all <- function(type, package, sim.dir) {
 	diag.dir <- file.path(sim.dir, 'diagnostics')
 	if (!file.exists(diag.dir)) return(NULL)
-	files <- list.files(diag.dir, pattern='^bayesTFR[.]convergence_[0-9]+_[0-9]+[.]rda$', full.names=FALSE)
+	files <- list.files(diag.dir, pattern=paste('^', package, '[.]convergence_[0-9]+_[0-9]+[.]rda$', sep=''), 
+							full.names=FALSE)
 	if(length(files) <= 0) return(NULL)
 	thin.matches <- regexpr('e_[0-9]+', files)
 	bi.matches <- regexpr('[0-9]+[.]', files)
@@ -200,9 +208,13 @@ get.tfr.convergence.all <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'
 								stop=thin.matches[i]+attr(thin.matches, 'match.length')[i]-1))
 		burnin <- as.integer(substr(files[i], start=bi.matches[i], 
 								stop=bi.matches[i]+attr(bi.matches, 'match.length')[i]-2))
-		result[[i]] <- get.tfr.convergence(sim.dir, thin=thin, burnin=burnin)
+		result[[i]] <- do.call(paste('get.', type, '.convergence', sep=''), 
+								list(sim.dir, thin=thin, burnin=burnin))
 	}
 	return(result)
+}
+get.tfr.convergence.all <- function(sim.dir=file.path(getwd(), 'bayesTFR.output')) {
+	return(.do.get.convergence.all('tfr', 'bayesTFR', sim.dir=sim.dir))
 }
 
 get.tfr.convergence <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'), 
@@ -228,9 +240,9 @@ get.burned.tfr.traces <- function(mcmc, par.names, burnin=0, thinning.index=NULL
 		traces <- traces[thinning.index,]
 	return(traces)
 }
-"do.get.traces" <- function(mcmc, ...) UseMethod("do.get.traces")
+"bdem.parameter.traces" <- function(mcmc, ...) UseMethod("bdem.parameter.traces")
 
-do.get.traces.bayesTFR.mcmc <- function(mcmc, par.names, ...) {
+bdem.parameter.traces.bayesTFR.mcmc <- function(mcmc, par.names, ...) {
 	# Load traces from the disk
 	all.standard.names <- c(tfr.parameter.names(), get.trans.parameter.names(), 
 							tfr.parameter.names.cs(), get.trans.parameter.names(cs=TRUE))
@@ -311,7 +323,7 @@ do.get.traces.bayesTFR.mcmc <- function(mcmc, par.names, ...) {
 		if (!has.tran[i]) next
 		full.names <- grep(paste(totran.names[i],'_', sep=''), valnames, value=TRUE)
 		if (length(grep(paste('^', totran.names[i], '(_|$)', sep=''), valnames)) == 0) { # load alpha/delta/gamma
-			vals <- do.get.traces(mcmc, c(totran.names[i]), 
+			vals <- bdem.parameter.traces(mcmc, c(totran.names[i]), 
 							file.postfix=file.postfix, par.names.postfix=par.names.postfix,
 							burnin=burnin, thinning.index=thinning.index)
 			full.names <- grep(paste(totran.names[i],'_', sep=''), c(valnames, colnames(vals)), value=TRUE)
@@ -457,7 +469,7 @@ do.get.tfr.parameter.traces <- function(is.cs, mcmc.list, par.names, country.obj
     	if (no.traces.loaded(mcmc) || th.burnin < mcmc$traces.burnin) {
     		traces <- if(is.cs) load.tfr.parameter.traces.cs(mcmc, country.obj$code, par.names, burnin=th.burnin, 
     											thinning.index=this.thinning.index)
-    					else do.get.traces(mcmc, par.names, burnin=th.burnin, thinning.index=this.thinning.index)
+    					else bdem.parameter.traces(mcmc, par.names, burnin=th.burnin, thinning.index=this.thinning.index)
         } else {
             traces <- if(is.cs) get.burned.tfr.traces(mcmc, get.full.par.names.cs(par.names, colnames(mcmc$traces), 
             									country=country.obj$index), 
@@ -487,12 +499,12 @@ get.tfr.parameter.traces.cs <- function(mcmc.list, country.obj, par.names=tfr.pa
 
 
 load.tfr.parameter.traces <- function(mcmc, par.names=tfr.parameter.names(), burnin=0, thinning.index=NULL) {
- 	return(do.get.traces(mcmc, par.names, burnin=burnin, thinning.index=thinning.index))
+ 	return(bdem.parameter.traces(mcmc, par.names, burnin=burnin, thinning.index=thinning.index))
 }
 
 load.tfr.parameter.traces.cs <- function(mcmc, country, par.names=tfr.parameter.names.cs(), burnin=0, 
 										thinning.index=NULL) {
- 	return(do.get.traces(mcmc, par.names, paste('_country', country, sep=''),
+ 	return(bdem.parameter.traces(mcmc, par.names, paste('_country', country, sep=''),
 						par.names.postfix=paste('_c', country, sep=''), burnin=burnin, 
 						thinning.index=thinning.index))
 }
@@ -501,7 +513,7 @@ load.tfr.parameter.traces.all <- function(mcmc, par.names=tfr.parameter.names(),
 										 par.names.cs=tfr.parameter.names.cs(),
 										 burnin=0, thinning.index=NULL) {
 	result <- load.tfr.parameter.traces(mcmc, par.names, burnin=burnin, thinning.index=thinning.index)
-	for (country in mcmc$meta$id_DL) {
+	for (country in get.countries.index(mcmc$meta)) {
 		result <- cbind(result, 
 						load.tfr.parameter.traces.cs(mcmc, 
 												    get.country.object(country, 
@@ -541,7 +553,9 @@ get.full.par.names <- function(par.names, full.par.names, index=FALSE) {
 	return(result)
 }
 
-coda.mcmc <- function(mcmc, country=NULL, par.names=tfr.parameter.names(), 
+"coda.mcmc" <- function(mcmc, ...) UseMethod("coda.mcmc")
+
+coda.mcmc.bayesTFR.mcmc <- function(mcmc, country=NULL, par.names=tfr.parameter.names(), 
 						par.names.cs=tfr.parameter.names.cs(), burnin=0, thin=1, ...
 						) {
 	# Return a coda object for this mcmc and parameter names
@@ -580,7 +594,7 @@ coda.mcmc <- function(mcmc, country=NULL, par.names=tfr.parameter.names(),
 }
 	
 	
-coda.mcmc.list <- function(mcmc.list=NULL, country=NULL, chain.ids=NULL,
+coda.mcmc.list <- function(mcmc=NULL, country=NULL, chain.ids=NULL,
 							sim.dir=file.path(getwd(), 'bayesTFR.output'), 
 							par.names=tfr.parameter.names(), 
 							par.names.cs=tfr.parameter.names.cs(), 
@@ -588,6 +602,7 @@ coda.mcmc.list <- function(mcmc.list=NULL, country=NULL, chain.ids=NULL,
 							burnin=0, 
 							low.memory=FALSE, ...) {
 	# return a list of mcmc objects that can be analyzed using the coda package
+	mcmc.list <- mcmc
 	if (is.null(mcmc.list)) {
 		mcmc.list <- get.tfr.mcmc(sim.dir, chain.ids=chain.ids, low.memory=low.memory, 
 									burnin=burnin)$mcmc.list
@@ -599,8 +614,8 @@ coda.mcmc.list <- function(mcmc.list=NULL, country=NULL, chain.ids=NULL,
 	}
 	result <- list()
 	i <- 1
-	for(mcmc in mcmc.list) {
-		result[[i]] <- coda.mcmc(mcmc, country=country, par.names=par.names, par.names.cs=par.names.cs,
+	for(mc in mcmc.list) {
+		result[[i]] <- coda.mcmc(mc, country=country, par.names=par.names, par.names.cs=par.names.cs,
 								 burnin=burnin, ...)
 
 		if (rm.const.pars) {
@@ -654,6 +669,12 @@ get.mcmc.list.bayesTFR.mcmc <- function(mcmc.list, ...) return(list(mcmc.list))
 get.mcmc.list.bayesTFR.prediction <- function(mcmc.list, ...) return(mcmc.list$mcmc.set$mcmc.list)
 get.mcmc.list.list <- function(mcmc.list, ...) return(mcmc.list)
 
+"get.mcmc.meta" <- function(meta, ...) UseMethod("get.mcmc.meta")
+get.mcmc.meta.bayesTFR.mcmc.set <- function(meta, ...) return(meta$meta)
+get.mcmc.meta.bayesTFR.mcmc.meta <- function(meta, ...) return(meta)
+get.mcmc.meta.bayesTFR.mcmc <- function(meta, ...) return(meta$meta)
+get.mcmc.meta.bayesTFR.prediction <- function(meta, ...) return(meta$mcmc.set$meta)
+
 
 get.country.object <- function(country, meta=NULL, country.table=NULL, index=FALSE) {
 	# If meta object is not given, country.table containing columns 'code' and 'name' must be given. 
@@ -689,13 +710,7 @@ get.country.object <- function(country, meta=NULL, country.table=NULL, index=FAL
 }
 
 country.names <- function(meta, countries=NULL, index=FALSE) {
-	meta <- switch(class(meta),
-		'bayesTFR.mcmc.meta' = meta,
-		'bayesTFR.mcmc.set' = meta$meta,
-		'bayesTFR.mcmc' = meta$meta,
-		'bayesTFR.prediction' = meta$mcmc.set$meta,
-		stop('Wrong type of meta argument. Allowed: bayesTFR.mcmc.meta, bayesTFR.mcmc.set, bayesTFR.mcmc, bayesTFR.prediction.')
-		)
+	meta <- get.mcmc.meta(meta)
 	if (is.null(countries)) return(meta$regions$country_name)
 	if (index) return(meta$regions$country_name[countries])
 	get.country.index <- function(code) {
@@ -758,7 +773,7 @@ get.meta.only <- function(object) {
 	res <- list(nr.chains=object$meta$nr.chains, 
 					iters=sapply(object$mcmc.list, get.iter),
 					thin=object$mcmc.list[[1]]$thin)
-	class(res) <- 'summary.bayesTFR.mcmc.set.meta'
+	class(res) <- paste('summary.', class(object), '.meta', sep='')
 	return(res)
 }
  
@@ -771,16 +786,17 @@ print.summary.bayesTFR.mcmc.set.meta <- function(x, ...) {
 	invisible(x)
 }
 
-summary.bayesTFR.prediction <- function(object, country=NULL, compact=TRUE, ...) {
+get.prediction.summary.data <- function(object, unchanged.pars, country, compact) {
 	res <- list()
-	for (par in c('burnin', 'nr.traj', 'mu', 'rho', 'sigmaAR1'))
+	for (par in unchanged.pars)
 		res[[par]] <- object[[par]]
 	proj.years <- seq(object$end.year-5*object$nr.projections-2, object$end.year-2, by=5)
 	res$projection.years <- proj.years[2:(object$nr.projections+1)]
-	class(res) <- 'summary.bayesTFR.prediction'
 	if(is.null(country)) return(res)
 	country <- get.country.object(country, object$mcmc.set$meta)
+	if(is.null(country$code)) stop('No prediction available for this country.')
 	res$country.name <- country$name
+	
 	if(compact) {
 		quantiles.to.show <- c(0.025, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.975)
 		quant.index <- is.element(dimnames(object$quantiles)[[2]], as.character(quantiles.to.show))
@@ -788,8 +804,15 @@ summary.bayesTFR.prediction <- function(object, country=NULL, compact=TRUE, ...)
 		quant.index <- 1:dim(object$quantiles)[2]
 	}
 	res$projections <- cbind(t(object$traj.mean.sd[country$index,,]), t(object$quantiles[country$index,quant.index,]))
-	colnames(res$projections) <- c('mean', 'SD', paste(as.numeric(dimnames(object$quantiles)[[2]][quant.index])*100, '%', sep=''))
+	colnames(res$projections) <- c('mean', 'SD', 
+			paste(as.numeric(dimnames(object$quantiles)[[2]][quant.index])*100, '%', sep=''))
 	rownames(res$projections) <- proj.years
+	return(res)
+}
+
+.update.summary.data.by.shift <- function(res, object, country) {
+	if(is.null(res$projections)) return(res)
+	country <- get.country.object(country, object$mcmc.set$meta)
 	shift <- get.tfr.shift(country$code, object)
 	res$manual <- FALSE
 	if(!is.null(shift)) {
@@ -797,8 +820,15 @@ summary.bayesTFR.prediction <- function(object, country=NULL, compact=TRUE, ...)
 												 ncol=nrow(res$projections), nrow=ncol(res$projections)-1, byrow=TRUE))
 		res$manual <- TRUE
 	}
-												 
 	return(res)
+}
+
+summary.bayesTFR.prediction <- function(object, country=NULL, compact=TRUE, ...) {
+	res <- get.prediction.summary.data(object, 
+				unchanged.pars=c('burnin', 'nr.traj', 'mu', 'rho', 'sigmaAR1'), 
+				country=country, compact=compact)
+	class(res) <- 'summary.bayesTFR.prediction'
+	return(.update.summary.data.by.shift(res, object, country))
 }
 
 print.summary.bayesTFR.prediction <- function(x, digits = 3, ...) {
@@ -857,10 +887,11 @@ summary.bayesTFR.convergence <- function(object, expand=FALSE, ...) {
 		cat('\nSimulation has converged.')
 		cat('\nNumber of trajectories to be used:', object$use.nr.traj)
 	}
-	if(expand && !object$status['green'] && !is.null(object$not.conv.cs)) {
+	if(expand && !object$status['green'] && !is.null(object$country.specific) 
+			&& !is.null(object$country.specific$not.converged.parameters)) {
 		cat('\nWarning: ')
 		cat('The following parameters did not converge:\n')
-		print(object$not.conv.cs)
+		print(object$country.specific$not.converged.parameters)
 	}		
 	cat('\nStatus:', names(object$status)[object$status], '\n')
 }
@@ -920,3 +951,19 @@ get.tfr.trajectories <- function(tfr.pred, country) {
 	country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta)
 	return(get.trajectories(tfr.pred, country.obj$code)$trajectories)
 }
+
+"get.nr.countries" <- function(meta, ...) UseMethod("get.nr.countries")
+ 
+get.nr.countries.bayesTFR.mcmc.meta <- function(meta, ...) return (meta$nr_countries)
+
+"get.nr.countries.est" <- function(meta, ...) UseMethod("get.nr.countries.est")
+ 
+get.nr.countries.est.bayesTFR.mcmc.meta <- function(meta, ...) return (meta$nr_countries_estimation)
+
+"get.data.matrix" <- function(meta, ...) UseMethod("get.data.matrix")
+ 
+get.data.matrix.bayesTFR.mcmc.meta <- function(meta, ...) return (meta$tfr_matrix)
+
+"get.countries.index" <- function(meta, ...) UseMethod("get.countries.index")
+
+get.countries.index.bayesTFR.mcmc.meta  <- function(meta, ...) return (meta$id_DL)

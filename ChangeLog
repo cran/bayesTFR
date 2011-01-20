@@ -1,3 +1,19 @@
+1.2-0 (01/19/2011)
+-----
+Function write.projection.summary now writes out a file with the model parameters.
+
+Many internal changes and small bug fixes.
+
+1.1-1 (11/17/2010)
+-----
+do.get.traces renamed to bdem.parameter.traces
+
+NAMESPACE modified.
+
+Bug fixed in the plotting traces function.
+
+Internal changes to allow bayesLife reusing package functionality.
+
 1.1-0 (10/14/2010)
 -----
 Functions tfr.median.set and tfr.median.shift for modifying the projection medians (request of the UN population division).

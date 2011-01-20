@@ -26,9 +26,9 @@ United Nations table of locations, including regions, as available in 2008.  It 
 %\details{
 %%  ~~ If necessary, more details than the __description__ above ~~
 %}
-%\source{
-%%  ~~ reference to a publication or URL from which the data were obtained ~~
-%}
+\source{
+Data provided by the United Nations Population Division
+}
 %\references{
 %%  ~~ possibly secondary sources and usages ~~
 %}

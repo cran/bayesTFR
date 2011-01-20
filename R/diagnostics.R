@@ -222,7 +222,7 @@ tfr.raftery.diag <- function(mcmc=NULL,
 			country.obj <- get.country.object(country, mcmc.set$meta)
 			c.index <- country.obj$index
 		} else {
-			c.index <- 1:mcmc.set$meta$nr_countries_estimation
+			c.index <- 1:get.nr.countries.est(mcmc.set$meta)
 			if(country.sampling.prop < 1) 
 				c.index <- sort(sample(c.index, size=round(length(c.index)*country.sampling.prop,0)))
 		}
@@ -285,7 +285,7 @@ tfr.raftery.diag <- function(mcmc=NULL,
 	lcolidx.cind <- length(colidx.cind)
 	lcolidx.cdep <- length(colidx.cdep)
 	N.country.ind <- N.country.dep <- notconv1 <- notconv2 <- notconvinchain1 <- notconvinchain2 <- NULL
-	iter <- nr.chains*mcmc.set$mcmc.list[[1]]$finished.iter
+	iter <- nr.chains*(mcmc.set$mcmc.list[[1]]$finished.iter - burnin)
 	for(chain in 1:nr.chains) {
 		N <- rbind(result.025[chain,], result.975[chain,])
 		where.larger <- N > iter
@@ -299,7 +299,7 @@ tfr.raftery.diag <- function(mcmc=NULL,
 										chain.id=rep(chain, sum(where.larger[2,])),
 										N=N[2,where.larger[2,]])
 								  )
-		where.larger.inchain <- N > mcmc.set$mcmc.list[[chain]]$finished.iter
+		where.larger.inchain <- N > (mcmc.set$mcmc.list[[chain]]$finished.iter - burnin)
 		notconvinchain1 <- rbind(notconvinchain1, 
 								  cbind(parameter.name=par.names.all[where.larger.inchain[1,]], 
 										chain.id=rep(chain, sum(where.larger.inchain[1,])),
@@ -381,7 +381,7 @@ tfr.raftery.diag <- function(mcmc=NULL,
 				N.country.spec=N.country.dep,
 				Nmedian.country.spec=round(Nmed.cs,0),
 				thin.ind=list('0.025'=thin.ind.025, '0.975'=thin.ind.975, median=thin.ind),
-				nr.countries=c(used=length(c.index), total=mcmc.set$meta$nr_countries_estimation)))
+				nr.countries=c(used=length(c.index), total=get.nr.countries.est(mcmc.set$meta))))
 }
 
 process.not.converged.parameters <- function(diag, iter) {
@@ -404,15 +404,16 @@ process.not.converged.parameters <- function(diag, iter) {
 	return(N)
 }
 	
-tfr.diagnose <- function(sim.dir, thin=80, burnin=2000, express=FALSE, 
+.do.diagnose <- function(type, class.name, sim.dir, thin=80, burnin=2000, express=FALSE, 
 							country.sampling.prop=NULL, keep.thin.mcmc=FALSE, verbose=TRUE) {
 	get.country.name <- function(par) {
 		cindex <- strsplit(par, '_c')[[1]]
 		cindex <- as.numeric(cindex[length(cindex)])
 		return(get.country.object(cindex, meta=mcmc.set$meta)$name)
 	}
-	
-	mcmc.set <- get.tfr.mcmc(sim.dir=sim.dir, low.memory=TRUE)
+
+	mcmc.set <- do.call(paste('get.', type, '.mcmc', sep=''), 
+						list(sim.dir=sim.dir, low.memory=TRUE))
 	if(is.null(mcmc.set))
 		stop('No valid simulation in ', sim.dir)
 	iter <- get.total.iterations(mcmc.set$mcmc.list, burnin)
@@ -420,21 +421,23 @@ tfr.diagnose <- function(sim.dir, thin=80, burnin=2000, express=FALSE,
 	if(iter/thin < 1) stop(paste('Value of thin is too high (', thin, 
 							') given the total number of iterations (', iter, ').', sep=''))
 	#run raftery.diag on country-independent parameters
-	raftery.diag.res <- tfr.raftery.diag(mcmc.set, par.names.cs=NULL, thin=thin,
-								burnin=burnin, verbose=verbose)
-	if (is.null(raftery.diag.res)) stop('Problem in tfr.raftery.diag.')
+	diag.procedure <- paste(type, '.raftery.diag', sep='')
+	raftery.diag.res <- do.call(diag.procedure, 
+								list(mcmc.set, par.names.cs=NULL, thin=thin,
+								burnin=burnin, verbose=verbose))
+	if (is.null(raftery.diag.res)) stop(paste('Problem in', diag.procedure))
 	raftery.diag.res.cs <- NULL
 	if(!is.null(country.sampling.prop)) express <- FALSE
 	if(!express &&((!is.null(country.sampling.prop) && (country.sampling.prop>0)) 
 						|| is.null(country.sampling.prop))) {
 		#run raftery.diag on country-specific parameters
-		raftery.diag.res.cs <- tfr.raftery.diag(mcmc.set, 
+		raftery.diag.res.cs <- do.call(diag.procedure, list(mcmc.set, 
 								par.names = NULL,
 								thin=thin,  burnin=burnin,
 								country.sampling.prop=if(is.null(country.sampling.prop)) 1 else country.sampling.prop,
 								verbose=verbose
-								)
-		if (is.null(raftery.diag.res.cs)) stop('Problem in tfr.raftery.diag.')
+								))
+		if (is.null(raftery.diag.res.cs)) stop(paste('Problem in', diag.procedure))
 	}
 	status <- c(red=FALSE, green=FALSE)
 	res <- NULL
@@ -454,13 +457,15 @@ tfr.diagnose <- function(sim.dir, thin=80, burnin=2000, express=FALSE,
 	if(to.run <= 0) status['green'] <- TRUE
 	else status['red'] <- TRUE
 	nr.countries <- if(!is.null(raftery.diag.res.cs)) raftery.diag.res.cs$nr.countries 
-					else c(used=0, total=mcmc.set$meta$nr_countries_estimation)
+					else c(used=0, total=get.nr.countries.est(mcmc.set$meta))
 	use.nr.traj <- floor(iter/thin)
 	thinned.mcmc <- NULL
 	if(keep.thin.mcmc) {
-		thinned.mcmc <- get.thinned.tfr.mcmc(mcmc.set, thin=thin, burnin=burnin)
+		thinned.mcmc <- do.call(paste('get.thinned.', type, '.mcmc', sep=''), 
+										list(mcmc.set, thin=thin, burnin=burnin))
 		if(is.null(thinned.mcmc) || thinned.mcmc$meta$parent.iter < iter) 
-			thinned.mcmc <- create.thinned.tfr.mcmc(mcmc.set, thin=thin, burnin=burnin, verbose=verbose)
+			thinned.mcmc <- do.call(paste('create.thinned.', type, '.mcmc', sep=''), 
+										list(mcmc.set, thin=thin, burnin=burnin, verbose=verbose))
 	}
 	diag <- structure(list(result=res,
 					lresult.country.independent=lres.cind,
@@ -475,16 +480,22 @@ tfr.diagnose <- function(sim.dir, thin=80, burnin=2000, express=FALSE,
 					thin=thin,
 					express=express, 
 					nr.countries=nr.countries),
-				 class='bayesTFR.convergence')
+				 class=class.name)
 	if(verbose) summary(diag)
 	save.dir <- file.path(sim.dir, 'diagnostics')
 	if(!file.exists(save.dir)) 
 		dir.create(save.dir, recursive=TRUE)
-	save.file <- file.path(save.dir, paste('bayesTFR.convergence_', thin, '_', burnin, '.rda', sep=''))
-	bayesTFR.convergence <- diag
-	save(bayesTFR.convergence, file=save.file)
+	save.file <- do.call(paste('store.', class.name, sep=''), list(diag, thin=thin, burnin=burnin, 
+							output.dir=save.dir))
 	if(verbose) cat('\nConvergence diagnostics stored in', save.file, '\n')
-	invisible(diag)
+	return(diag)
+}
+
+tfr.diagnose <- function(sim.dir, thin=80, burnin=2000, express=FALSE, 
+							country.sampling.prop=NULL, keep.thin.mcmc=FALSE, verbose=TRUE) {
+	invisible(.do.diagnose(type='tfr', class.name='bayesTFR.convergence', 
+							sim.dir=sim.dir, thin=thin, burnin=burnin, express=express,
+							country.sampling.prop=country.sampling.prop, keep.thin.mcmc=keep.thin.mcmc,							verbose=verbose))
 }
 
 diag.thin.indep <- function(mcmc.list, q) {

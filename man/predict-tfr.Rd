@@ -24,13 +24,13 @@ tfr.predict(mcmc.set = NULL, end.year = 2100,
   \item{mcmc.set}{Object of class \code{\link{bayesTFR.mcmc.set}}. If it is \code{NULL}, the object is loaded from the directory given by \code{sim.dir}.}
   \item{end.year}{End year of the prediction.}
   \item{sim.dir}{Directory with the MCMC simulation results. It should equal to the \code{output.dir} argument in \code{\link{run.tfr.mcmc}}.}
-  \item{replace.output}{If \code{TRUE}, existing predictions in \code{output.dir} will be replaced by results of this run.}
-  \item{nr.traj}{Number of trajectories to be generated. If \code{NULL}, the argument \code{thin} is taken to determine the number of trajectories. If both are \code{NULL}, the number of trajectories corresponds to the size of the parameters sample.}
+  \item{replace.output}{Logical. If \code{TRUE}, existing predictions in \code{output.dir} will be replaced by results of this run.}
+  \item{nr.traj}{Number of trajectories to be generated. If \code{NULL}, the argument \code{thin} is taken to determine the number of trajectories. If both are \code{NULL}, the number of trajectories corresponds to the size of the parameter sample.}
   \item{thin}{Thinning interval used for determining the number of trajectories. Only relevant, if \code{nr.traj} is \code{NULL}.}
   \item{burnin}{Number of iterations to be discarded from the beginning of the parameter traces.}
   \item{use.diagnostics}{Logical determining if an existing convergence diagnostics should be used for choosing the values of \code{thin} and \code{burnin}. In such a case, arguments \code{nr.traj}, \code{thin} and \code{burnin} are ignored. The \sQuote{best} values are chosen from results of running the \code{\link{tfr.diagnose}} function. Only diagnostics can be used that suggest a convergence of the underlying MCMCs. If there are more than one such objects, the one is chosen whose recommendation for the number of trajectories is larger and closest to 2000.}
-  \item{save.as.ascii}{Either a number determining how many trajectories should be converted into an ASCII file, or \dQuote{all} in which case all trajectories are converted. It should be set to 0, if no converions is desired.}
-  \item{output.dir}{Directory into which the resulting prediction object and the trajectories are stored. If it is \code{NULL}, it is set to either \code{sim.dir}, or to \code{output.dir} of \code{mcmc.set$meta} if \code{mcmc.set} it is given.}
+  \item{save.as.ascii}{Either a number determining how many trajectories should be converted into an ASCII file, or \dQuote{all} in which case all trajectories are converted. It should be set to 0, if no conversion is desired.}
+  \item{output.dir}{Directory into which the resulting prediction object and the trajectories are stored. If it is \code{NULL}, it is set to either \code{sim.dir}, or to \code{output.dir} of \code{mcmc.set$meta} if \code{mcmc.set} is given.}
   \item{low.memory}{Logical indicating if the prediction should run in a low-memory mode. If it is \code{FALSE}, the whole traces of all parameters, including the burnin, are loaded into memory. Otherwise, burnins are discarded and parameters are loaded as they are needed and are not kept in the memory.}
   \item{mu}{Long-term mean \eqn{\mu}{mu} in the AR(1) projection model.}
   \item{rho}{Autoregressive parameter \eqn{\rho}{rho} in AR(1) projection model. If it is \code{NULL} it is estimated from the data.}
@@ -64,7 +64,7 @@ The resulting prediction object is saved into \file{\{output.dir\}/predictions}.
 	}
 	
 \references{
-L. Alkema, A. E. Raftery, P. Gerland, S. J. Clark, F. Pelletier, Buettner, T.: 
+L. Alkema, A. E. Raftery, P. Gerland, S. J. Clark, F. Pelletier, T. Buettner: 
 Probabilistic projections of the total fertility rate for all countries. Working Paper nr. 97, Center for Statistics and the Social Sciences, University of Washington. \url{http://www.csss.washington.edu/Papers}
 }
 \author{

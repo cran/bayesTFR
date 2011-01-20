@@ -15,11 +15,12 @@ a thinned and burned version of the given MCMC set. \code{create.thinned.tfr.mcm
 get.thinned.tfr.mcmc(mcmc.set, thin = 1, burnin = 0)
 
 create.thinned.tfr.mcmc(mcmc.set, thin = 1, burnin = 0, 
-	verbose = TRUE)
+	output.dir = NULL, verbose = TRUE)
 }
 \arguments{
   \item{mcmc.set}{Object of class \code{\link{bayesTFR.mcmc.set}}.}
   \item{thin, burnin}{Thinning interval and burnin used for creating or identifying the thinned object.}
+  \item{output.dir}{Output directory. It is only used if the output goes to a non-standard directory.}
   \item{verbose}{Logical switching log messages on and off.}
 }
 \details{
@@ -30,15 +31,10 @@ The thinning is done as follows: The given \code{burnin} is removed from the beg
 \value{
 Both functions return an object of class \code{\link{bayesTFR.mcmc.set}}. \code{get.thinned.tfr.mcmc} returns \code{NULL} if such object does not exist.
 }
-%\references{
-%% ~put references to the literature/web site here ~
-%}
+
 \author{
 Hana Sevcikova
 }
-%\note{
-%%  ~~further notes~~
-%}
 
 %% ~Make other sections like Warning with \section{Warning }{....} ~
 

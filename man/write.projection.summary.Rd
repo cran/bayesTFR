@@ -6,7 +6,7 @@
 Writing Projection Summary Files
 }
 \description{
-The function creates two files containing projection summaries, such as the median, the lower and upper bound of the 80 and 90\% probability intervals, respectively, the +/- 0.5 child variant and the constant variant. One file is in a user-friendly format, whereas the other is in a UN-specific format with internal coding of the time and the variants.
+The function creates two files containing projection summaries, such as the median, the lower and upper bound of the 80 and 90\% probability intervals, respectively, the +/- 0.5 child variant and the constant variant. One file is in a user-friendly format, whereas the other is in a UN-specific format with internal coding of the time and the variants. In addition, a file containing  some of the model parameters is created.
 }
 \usage{
 write.projection.summary(dir = file.path(getwd(), "bayesTFR.output"), 
@@ -19,21 +19,33 @@ write.projection.summary(dir = file.path(getwd(), "bayesTFR.output"),
 }
 \details{
 The first file that the function creates is called \file{projection_summary_user_friendly.csv}, it is a comma-separated table with the following columns: 
-\itemize{\item{\dQuote{country_name}}{country name}
-		 \item{\dQuote{country_code}}{country code}
-		 \item{\dQuote{variant}}{name of the variant, such as \dQuote{median}, \dQuote{lower 80}, \dQuote{upper 80}, \dQuote{lower 95}, \dQuote{upper 95}, \dQuote{-0.5child}, \dQuote{+0.5child}, \dQuote{constant}}
-		\item{period1}{e.g. \dQuote{2005-2010}: TFR for the first time period}
-		\item{period2}{e.g. \dQuote{2010-2015}: TFR for the second time period}
-		\item{...}{further columns with TFR projections}
+\itemize{\item{\dQuote{country_name}: }{country name}
+		 \item{\dQuote{country_code}: }{country code}
+		 \item{\dQuote{variant}: }{name of the variant, such as \dQuote{median}, \dQuote{lower 80}, \dQuote{upper 80}, \dQuote{lower 95}, \dQuote{upper 95}, \dQuote{-0.5child}, \dQuote{+0.5child}, \dQuote{constant}}
+		\item{period1: }{e.g. \dQuote{2005-2010}: TFR for the first time period}
+		\item{period2: }{e.g. \dQuote{2010-2015}: TFR for the second time period}
+		\item{\dots }{further columns with TFR projections}
 	}
 
 The second file, called \file{projection_summary.csv}, also comma-separated table, contains the same information as above in a UN-specific format:
-\itemize{\item{\dQuote{RevID}}{revision number, passed to the function as an argument}
-		  \item{\dQuote{VarID}}{variant identifier, extracted from the \code{\link{UN_variants}} dataset}
-		  \item{\dQuote{LocID}}{country code}
-		  \item{\dQuote{TimeID}}{time identifier, extracted from the \code{\link{UN_time}} dataset}
-		  \item{\dQuote{TFR}}{the total fertility rate for this variant, location and time period}
+\itemize{\item{\dQuote{RevID}: }{revision number, passed to the function as an argument}
+		  \item{\dQuote{VarID}: }{variant identifier, extracted from the \code{\link{UN_variants}} dataset}
+		  \item{\dQuote{LocID}: }{country code}
+		  \item{\dQuote{TimeID}: }{time identifier, extracted from the \code{\link{UN_time}} dataset}
+		  \item{\dQuote{TFR}: }{the total fertility rate for this variant, location and time period}
 }
+
+The third comma-separated file, called \file{projection_summary_parameters.csv}, contains the following columns:
+\itemize{\item{\dQuote{country_name}: }{country name}
+		 \item{\dQuote{country_code}: }{country code}
+		 \item{\dQuote{TF_time_start_decline}: }{start period of TFR decline}
+		 \item{\dQuote{TF_max}: }{TFR at the onset of the fertitility transition (median of the \eqn{U_c} parameter)}
+		 \item{\dQuote{TF_max_decrement}: }{maximum decrement of TFR decline (median of the \eqn{d_c} parameter)}
+		 \item{\dQuote{TF_end_level}: }{median of the end level of the fertility transition (\eqn{\Delta_{c4}}{Triangle_c4} parameter)}
+		 \item{\dQuote{TF_end_level_low}: }{2.5 percentile of the \eqn{\Delta_{c4}}{Triangle_c4} distribution}
+		 \item{\dQuote{TF_end_level_high}: }{97.5 percentile of the \eqn{\Delta_{c4}}{Triangle_c4} distribution}
+		 \item{\dQuote{TF_time_end_decline}: }{period of the end decline, measured using the prediction median}
+	}
 }
 %\references{
 %% ~put references to the literature/web site here ~

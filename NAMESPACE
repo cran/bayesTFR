@@ -7,6 +7,7 @@ export(
 	tfr.predict.extra,
 	tfr.median.shift,
 	tfr.median.set,
+	get.tfr.shift,
 	get.ar1.parameters,
 	convert.tfr.trajectories,
 	write.projection.summary,
@@ -14,6 +15,7 @@ export(
 	has.tfr.mcmc,
 	tfr.mcmc,
 	tfr.mcmc.list,
+	get.mcmc.list,
 	get.thinned.tfr.mcmc,
 	get.tfr.prediction,
 	has.tfr.prediction,
@@ -46,24 +48,35 @@ export(
 	get.tfr.map.parameters,
 	tfr.map.all,
 	tfr.map,
-	read.UNtfr,
 	read.tfr.file,
-	read.UNlocations,
-	get.TFRmatrix.and.regions,
 	tfr.gelman.diag,
 	tfr.plot.gelman,
 	tfr.raftery.diag,
 	tfr.diagnose,
-	get.median.from.prediction
+	get.median.from.prediction,
+	bdem.parameter.traces,
+	get.traj.ascii.header,
+	get.nr.countries,
+	get.nr.countries.est,
+	get.data.matrix,
+	get.countries.index,
+	get.data.imputed,
+	get.projection.summary.header,
+	get.UN.variant.names,
+	get.friendly.variant.names,
+	.get.gamma.pars,
+	.map.main.default
 )
 
 # register S3 methods
-S3method(do.get.traces, bayesTFR.mcmc)
+S3method(bdem.parameter.traces, bayesTFR.mcmc)
 
 S3method(get.mcmc.list, bayesTFR.mcmc.set)
 S3method(get.mcmc.list, bayesTFR.mcmc)
 S3method(get.mcmc.list, bayesTFR.prediction)
 S3method(get.mcmc.list, list)
+
+S3method(coda.mcmc, bayesTFR.mcmc)
 
 S3method(summary, bayesTFR.mcmc.set)
 S3method(summary, bayesTFR.mcmc)
@@ -72,4 +85,16 @@ S3method(summary, bayesTFR.convergence)
 
 S3method(print, summary.bayesTFR.prediction)
 S3method(print, summary.bayesTFR.mcmc.set.meta)
+
+S3method(get.traj.ascii.header, bayesTFR.mcmc.meta)
+S3method(get.nr.countries, bayesTFR.mcmc.meta)
+S3method(get.nr.countries.est, bayesTFR.mcmc.meta)
+S3method(get.data.matrix, bayesTFR.mcmc.meta)
+S3method(get.countries.index, bayesTFR.mcmc.meta)
+S3method(get.data.imputed, bayesTFR.prediction)
+S3method(get.projection.summary.header, bayesTFR.prediction)
+S3method(get.UN.variant.names, bayesTFR.prediction)
+S3method(get.friendly.variant.names, bayesTFR.prediction)
+S3method(.get.gamma.pars, bayesTFR.prediction)
+S3method(.map.main.default, bayesTFR.prediction)
 

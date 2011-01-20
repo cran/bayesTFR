@@ -34,30 +34,12 @@ DLcurve.plot.all(mcmc.list=NULL, sim.dir=NULL,
   \item{verbose}{Logical switching log messages on and off.}
 }
 \details{
-\code{DLcurve.plot} plots double logistic curves for the given country.  \code{DLcurve.plot.all} creates such plots for all countries and stores them in \code{output.dir}. Parameters inputting the double logistic function are either thinned traces created by the \code{\link{tfr.predict}} function (if \code{mcmc.list} is an object of class \code{\link{bayesTFR.prediction}} and if such thinned traces were generated), or they are selected by equal spacing from the MCMC traces. In the former case, \code{burnin} is set automatically; in the latter case, \code{burnin} defaults to 0. If \code{nr.curves} is smaller than 2000, the median and probability intervals are computed on a sample of 2000 equally spaced data points, otherwise on all plotted curves.
+\code{DLcurve.plot} plots double logistic curves for the given country.  \code{DLcurve.plot.all} creates such plots for all countries and stores them in \code{output.dir}. Parameters inputting the double logistic function are either thinned traces created by the \code{\link{tfr.predict}} function (if \code{mcmc.list} is an object of class \code{\link{bayesTFR.prediction}}), or they are selected by equal spacing from the MCMC traces. In the former case, \code{burnin} is set automatically; in the latter case, \code{burnin} defaults to 0. If \code{nr.curves} is smaller than 2000, the median and probability intervals are computed on a sample of 2000 equally spaced data points, otherwise on all plotted curves.
 }
-%\value{
-%%  ~Describe the value returned
-%%  If it is a LIST, use
-%%  \item{comp1 }{Description of 'comp1'}
-%%  \item{comp2 }{Description of 'comp2'}
-%% ...
-%}
-%\references{
-%% ~put references to the literature/web site here ~
-%}
+
 \author{
 Hana Sevcikova, Leontine Alkema
 }
-%\note{
-%%  ~~further notes~~
-%}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
-
-%\seealso{
-%% ~~objects to See Also as \code{\link{help}}, ~~~
-%}
 \examples{
 \dontrun{
 sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')
