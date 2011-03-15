@@ -130,6 +130,7 @@ run.tfr.mcmc <- function(nr.chains=3, iter=62000, output.dir=file.path(getwd(), 
 					 	verbose=verbose)
 		}
 	}
+	names(chain.set) <- 1:nr.chains
 	mcmc.set <- structure(list(meta=bayesTFR.mcmc.meta, mcmc.list=chain.set), class='bayesTFR.mcmc.set')
 	cat('\nResults stored in', output.dir,'\n')
 	

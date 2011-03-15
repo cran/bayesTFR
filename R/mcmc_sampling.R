@@ -172,8 +172,17 @@ tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE) {
             store.mcmc(mcmc, append=TRUE, flush.buffer=flush.buffer, verbose=verbose)
          }
 	}       # end simu loop MCMC
+	mcmc <- .cleanup.mcmc(mcmc)
     return(mcmc)
 }
+
+.cleanup.mcmc <- function(mcmc) {
+	for(item in names(mcmc)) {
+		if (item != 'meta' && is.element(item, mcmc$dontsave)) mcmc[[item]] <- NULL
+	}
+	return(mcmc)
+}
+
 
 tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample,
 											 iter=NULL, burnin=2000, verbose=FALSE) {
@@ -282,5 +291,6 @@ tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample
          				verbose=verbose)
          
 	}       # end simu loop MCMC
+	mcmc.orig <- .cleanup.mcmc(mcmc.orig)
     return(mcmc.orig)
 }

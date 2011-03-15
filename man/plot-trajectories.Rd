@@ -12,6 +12,7 @@ The functions plot/tabulate the posterior distribution of TFR trajectories for a
 \usage{
 tfr.trajectories.plot(tfr.pred, country, pi = c(80, 95), 
     half.child.variant = TRUE, nr.traj = NULL, 
+    adjusted.only = TRUE,
     xlim = NULL, ylim = NULL, type = 'b', 
     xlab = 'Year', ylab = 'TFR', main = NULL, \dots)
 	
@@ -29,6 +30,7 @@ tfr.trajectories.table(tfr.pred, country, pi = c(80, 95),
   \item{pi}{Probability interval. It can be a single number or an array.}
   \item{half.child.variant}{If \code{TRUE} the United Nations variant of \dQuote{\code{+/-0.5} child} (relative to the median) is shown.}
   \item{nr.traj}{Number of trajectories to be plotted. If \code{NULL}, all trajectories are plotted, otherwise they are thinned evenly.}
+  \item{adjusted.only}{Logical. By default, if the projection median is adjusted using e.g. \code{\link{tfr.median.set}}, the function plots the adjusted median. If \code{adjusted.only=FALSE} the original (non-adjusted) median is plotted as well.}
   \item{xlim, ylim, type, xlab, ylab, main}{Graphical parameters passed to the \code{plot} function.}
   \item{\dots}{Additional graphical parameters. For \code{tfr.trajectories.plot.all}, \code{\dots} contains also arguments
   		\code{pi}, \code{half.child.variant} and \code{nr.traj}.}

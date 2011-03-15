@@ -1,6 +1,7 @@
 \name{WPP2008_LOCATIONS}
 \Rdversion{1.1}
 \alias{WPP2008_LOCATIONS}
+\alias{WPP2010_LOCATIONS}
 \docType{data}
 \title{
 United Nations Table of Locations

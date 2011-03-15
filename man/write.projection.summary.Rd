@@ -10,15 +10,16 @@ The function creates two files containing projection summaries, such as the medi
 }
 \usage{
 write.projection.summary(dir = file.path(getwd(), "bayesTFR.output"), 
-    output.dir = NULL, revision = 14)
+    output.dir = NULL, revision = 14, adjusted = FALSE)
 }
 \arguments{
   \item{dir}{Directory containing the prediction object. It should correspond to the \code{output.dir} argument of the \code{\link{tfr.predict}} function.}
   \item{output.dir}{Directory in which the resulting file will be stored. If \code{NULL} the same directory is used as for the prediction.}
   \item{revision}{UN revision number. Used as a constant in the second file only.}
+  \item{adjusted}{Logical. By default the function writes summary using the original BHM projections. If the projection medians are adjusted (using e.g. \code{\link{tfr.median.set}}), setting this argument to \code{TRUE} causes using the adjusted projections.}
 }
 \details{
-The first file that the function creates is called \file{projection_summary_user_friendly.csv}, it is a comma-separated table with the following columns: 
+The first file that the function creates is called \file{projection_summary_user_friendly.csv} (or \file{projection_summary_user_friendly_adjusted.csv} if \code{adjusted=TRUE}), it is a comma-separated table with the following columns: 
 \itemize{\item{\dQuote{country_name}: }{country name}
 		 \item{\dQuote{country_code}: }{country code}
 		 \item{\dQuote{variant}: }{name of the variant, such as \dQuote{median}, \dQuote{lower 80}, \dQuote{upper 80}, \dQuote{lower 95}, \dQuote{upper 95}, \dQuote{-0.5child}, \dQuote{+0.5child}, \dQuote{constant}}
@@ -27,7 +28,7 @@ The first file that the function creates is called \file{projection_summary_user
 		\item{\dots }{further columns with TFR projections}
 	}
 
-The second file, called \file{projection_summary.csv}, also comma-separated table, contains the same information as above in a UN-specific format:
+The second file, called \file{projection_summary.csv} (or \file{projection_summary_adjusted.csv} if \code{adjusted=TRUE}), also comma-separated table, contains the same information as above in a UN-specific format:
 \itemize{\item{\dQuote{RevID}: }{revision number, passed to the function as an argument}
 		  \item{\dQuote{VarID}: }{variant identifier, extracted from the \code{\link{UN_variants}} dataset}
 		  \item{\dQuote{LocID}: }{country code}
@@ -35,7 +36,7 @@ The second file, called \file{projection_summary.csv}, also comma-separated tabl
 		  \item{\dQuote{TFR}: }{the total fertility rate for this variant, location and time period}
 }
 
-The third comma-separated file, called \file{projection_summary_parameters.csv}, contains the following columns:
+The third comma-separated file, called \file{projection_summary_parameters.csv} contains the following columns:
 \itemize{\item{\dQuote{country_name}: }{country name}
 		 \item{\dQuote{country_code}: }{country code}
 		 \item{\dQuote{TF_time_start_decline}: }{start period of TFR decline}
@@ -46,6 +47,7 @@ The third comma-separated file, called \file{projection_summary_parameters.csv},
 		 \item{\dQuote{TF_end_level_high}: }{97.5 percentile of the \eqn{\Delta_{c4}}{Triangle_c4} distribution}
 		 \item{\dQuote{TF_time_end_decline}: }{period of the end decline, measured using the prediction median}
 	}
+Note that this file is not created if \code{adjusted=TRUE}.
 }
 %\references{
 %% ~put references to the literature/web site here ~

@@ -300,6 +300,7 @@ mcmc.ini <- function(chain.id, mcmc.meta, iter=100,
     if (!save.all.parameters) dontsave.pars <- c(dontsave.pars, 'eps_Tc')
     if (!exists(".Random.seed")) runif(1)	    	
 	mcmc <- structure(list(
+						meta=mcmc.meta,
                         U_c=U_c, d_c=d_c, gamma_ci=gamma_ci, 
                         Triangle_c4 = Triangle_c4,
                         delta4 = delta4, Triangle4 = Triangle4,
@@ -313,7 +314,6 @@ mcmc.ini <- function(chain.id, mcmc.meta, iter=100,
                         output.dir=paste('mc', chain.id, sep=''),
                         traces=0, traces.burnin=0, 
                         rng.state = .Random.seed,
-                        meta=mcmc.meta,
                         dontsave=dontsave.pars
                         ),
                    class='bayesTFR.mcmc')
