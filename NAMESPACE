@@ -8,6 +8,7 @@ export(
 	tfr.median.shift,
 	tfr.median.set,
 	get.tfr.shift,
+	tfr.median.adjust,
 	get.ar1.parameters,
 	convert.tfr.trajectories,
 	write.projection.summary,
@@ -65,7 +66,11 @@ export(
 	get.UN.variant.names,
 	get.friendly.variant.names,
 	.get.gamma.pars,
-	.map.main.default
+	.map.main.default,
+	bdem.map.gvis,
+	tfr.map.gvis,
+	get.mcmc.meta,
+	par.names.for.worldmap
 )
 
 # register S3 methods
@@ -75,6 +80,11 @@ S3method(get.mcmc.list, bayesTFR.mcmc.set)
 S3method(get.mcmc.list, bayesTFR.mcmc)
 S3method(get.mcmc.list, bayesTFR.prediction)
 S3method(get.mcmc.list, list)
+
+S3method(get.mcmc.meta, bayesTFR.mcmc.meta)
+S3method(get.mcmc.meta, bayesTFR.mcmc.set)
+S3method(get.mcmc.meta, bayesTFR.mcmc)
+S3method(get.mcmc.meta, bayesTFR.prediction)
 
 S3method(coda.mcmc, bayesTFR.mcmc)
 
@@ -97,4 +107,5 @@ S3method(get.UN.variant.names, bayesTFR.prediction)
 S3method(get.friendly.variant.names, bayesTFR.prediction)
 S3method(.get.gamma.pars, bayesTFR.prediction)
 S3method(.map.main.default, bayesTFR.prediction)
-
+S3method(bdem.map.gvis, bayesTFR.prediction)
+S3method(par.names.for.worldmap, bayesTFR.prediction)

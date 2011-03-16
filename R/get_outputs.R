@@ -25,19 +25,20 @@ get.tfr.mcmc <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'), chain.id
 		if (verbose)
 			cat('Loading chain', imc.d, 'from disk. ')
 		load(file=file.path(sim.dir, mc.dirs.short[counter], 'bayesTFR.mcmc.rda'))
-		bayesTFR.mcmc$meta <- bayesTFR.mcmc.meta
+		mc <- c(list(meta=bayesTFR.mcmc.meta), bayesTFR.mcmc)
+		class(mc) <- class(bayesTFR.mcmc)
 		if (!low.memory) { # load full mcmc traces
-			th.burnin <- get.thinned.burnin(bayesTFR.mcmc, burnin)
-			bayesTFR.mcmc$traces <- load.tfr.parameter.traces.all(bayesTFR.mcmc, burnin=th.burnin)
-			bayesTFR.mcmc$traces.burnin <- th.burnin
+			th.burnin <- get.thinned.burnin(mc, burnin)
+			mc$traces <- load.tfr.parameter.traces.all(mc, burnin=th.burnin)
+			mc$traces.burnin <- th.burnin
 		} else { # traces will be loaded as they are needed
-			bayesTFR.mcmc$traces <- 0
-			bayesTFR.mcmc$traces.burnin <- 0
+			mc$traces <- 0
+			mc$traces.burnin <- 0
 		}
-		bayesTFR.mcmc$output.dir <- mc.dirs.short[counter]
+		mc$output.dir <- mc.dirs.short[counter]
 		if (verbose)
 			cat('(mcmc.list[[', counter, ']]).\n')
-		mcmc.chains[[counter]] <- bayesTFR.mcmc
+		mcmc.chains[[counter]] <- mc
 		counter <- counter+1
 	}
 	names(mcmc.chains) <- chain.ids

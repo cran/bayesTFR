@@ -10,8 +10,11 @@ test.DLcurve()
 test.TFRtrajectories()
 test.plot.density()
 test.get.parameter.traces()
-# disable the last three when submitting to CRAN
+test.median.adjust()
+test.plot.map()
+
+# disable the following tests when submitting to CRAN
 # to speed-up the checking procedure
-#test.plot.map()
+#test.imputation()
 #test.thinned.simulation()
 #test.run.mcmc.simulation.auto()

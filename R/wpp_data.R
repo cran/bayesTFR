@@ -37,7 +37,7 @@ set_wpp_regions <- function(start.year=1950, present.year=2005, wpp.year=2008, m
 				nr_countries_estimation=nr_countries_estimation))
 }
 
-read.tfr.file <- function(file) return(read.delim(file=file, comment.char='#'))
+read.tfr.file <- function(file) return(read.delim(file=file, comment.char='#', check.names=FALSE))
 
 do.read.un.file <- function(un.file.name, wpp.year, my.file=NULL, present.year=2005, verbose=FALSE) {
 	cat('Reading file ', un.file.name, '.\n')
@@ -124,10 +124,13 @@ get.observed.time.matrix.and.regions <- function(data, loc_data, start.year=1950
 	tfr_data <- data
 	nr_countries <- length(tfr_data[,1])
 	names.tfr.data <- names(tfr_data)
-	num.columns <- grep('^X[0-9]{4}.[0-9]{4}$', names.tfr.data) # index of year-columns 
+	#num.columns <- grep('^X[0-9]{4}.[0-9]{4}$', names.tfr.data) # index of year-columns
+	num.columns <- grep('^[0-9]{4}.[0-9]{4}$', names.tfr.data) # index of year-columns 
 	ncol.tfr <- length(num.columns)
-	cols.starty <- as.integer(substr(names.tfr.data[num.columns], 2,5))
-	cols.endy <- as.integer(substr(names.tfr.data[num.columns], 7,10))
+	#cols.starty <- as.integer(substr(names.tfr.data[num.columns], 2,5))
+	cols.starty <- as.integer(substr(names.tfr.data[num.columns], 1,4))
+	#cols.endy <- as.integer(substr(names.tfr.data[num.columns], 7,10))
+	cols.endy <- as.integer(substr(names.tfr.data[num.columns], 6,9))
 	start.index <- (1:ncol.tfr)[(cols.starty <= start.year) & (cols.endy > start.year)]
 	start.col <- names.tfr.data[num.columns][start.index[1]]
 	present.index <- (1:ncol.tfr)[(cols.endy >= present.year) & (cols.starty <= present.year)]
@@ -135,8 +138,10 @@ get.observed.time.matrix.and.regions <- function(data, loc_data, start.year=1950
 	proj.start.col <- names.tfr.data[num.columns][present.index[1]+1]
 
 	tfr_matrix <- t(tfr_data[,which.max(names(tfr_data)==start.col):which.max(names(tfr_data)==present.col)])
-	start.years <- as.integer(substr(rownames(tfr_matrix), 2,5))
-	end.years <- as.integer(substr(rownames(tfr_matrix), 7,10))
+	#start.years <- as.integer(substr(rownames(tfr_matrix), 2,5))
+	start.years <- as.integer(substr(rownames(tfr_matrix), 1,4))
+	#end.years <- as.integer(substr(rownames(tfr_matrix), 7,10))
+	end.years <- as.integer(substr(rownames(tfr_matrix), 6,9))
 	mid.years <- start.years + ceiling((end.years- start.years)/2)
 	rownames(tfr_matrix) <- mid.years				
 	tfr_matrix_all <- tfr_matrix
