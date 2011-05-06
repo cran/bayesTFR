@@ -2,7 +2,7 @@
 run.tfr.mcmc <- function(nr.chains=3, iter=62000, output.dir=file.path(getwd(), 'bayesTFR.output'), 
 						thin=1, replace.output=FALSE,
 						# meta parameters
-						start.year=1950, present.year=2010, wpp.year=2008,
+						start.year=1950, present.year=2010, wpp.year=2010,
 						my.tfr.file = NULL, buffer.size=100,
 					 	U.c.low=5.5, U.up=8.8, U.width=3,
 					 	mean.eps.tau0 = -0.25, sd.eps.tau0 = 0.4, nu.tau0 = 2,                                                
@@ -25,7 +25,7 @@ run.tfr.mcmc <- function(nr.chains=3, iter=62000, output.dir=file.path(getwd(), 
 					 	proposal_cov_gammas = NULL, # should be a list with elements 'values' and 'country_codes'
 					 	seed = NULL, parallel=FALSE, nr.nodes=nr.chains, 
 					 	save.all.parameters = FALSE, 
-					 	auto.conf = list(max.loops=3, iter=62000, nr.chains=3, thin=80, burnin=2000),
+					 	auto.conf = list(max.loops=5, iter=62000, iter.incr=10000, nr.chains=3, thin=80, burnin=2000),
 						verbose=FALSE, ...) {
 
 	if(file.exists(output.dir)) {
@@ -141,7 +141,7 @@ run.tfr.mcmc <- function(nr.chains=3, iter=62000, output.dir=file.path(getwd(), 
 		if(auto.conf$max.loops>1) {
 			for(loop in 2:auto.conf$max.loops) {
 				if(!inherits(diag, "try-error") && has.mcmc.converged(diag)) break
-				mcmc.set <- continue.tfr.mcmc(iter=auto.conf$iter, output.dir=output.dir, nr.nodes=nr.nodes,
+				mcmc.set <- continue.tfr.mcmc(iter=auto.conf$iter.incr, output.dir=output.dir, nr.nodes=nr.nodes,
 										  parallel=parallel, verbose=verbose)
 				diag <- try(tfr.diagnose(sim.dir=output.dir, keep.thin.mcmc=TRUE, 
 							thin=auto.conf$thin, burnin=auto.conf$burnin,
@@ -149,7 +149,7 @@ run.tfr.mcmc <- function(nr.chains=3, iter=62000, output.dir=file.path(getwd(), 
 			}
 		}
 	}
-	if (verbose) 
+	if (verbose)
 		cat('\nSimulation successfully finished!!!\n')
 	invisible(mcmc.set)
 }
@@ -201,7 +201,7 @@ continue.tfr.mcmc <- function(iter, chain.ids=NULL, output.dir=file.path(getwd()
 		if(is.null(auto.conf)) auto.conf <- list()
 		for (par in names(default.auto.conf))
 			if(is.null(auto.conf[[par]])) auto.conf[[par]] <- default.auto.conf[[par]]
-		iter <- auto.conf$iter
+		iter <- auto.conf$iter.incr
 		auto.run <- TRUE
 		fiter <- sapply(mcmc.set$mcmc.list, function(x) x$finished.iter)
 		if (!all(fiter== fiter[1])) stop('All chains must be of the same length if the "auto" option is used.')
@@ -230,7 +230,7 @@ continue.tfr.mcmc <- function(iter, chain.ids=NULL, output.dir=file.path(getwd()
 		if(auto.conf$max.loops>1) {
 			for(loop in 2:auto.conf$max.loops) {
 				if(!inherits(diag, "try-error") && has.mcmc.converged(diag)) break
-				mcmc.set <- continue.tfr.mcmc(iter=auto.conf$iter, output.dir=output.dir, nr.nodes=nr.nodes,
+				mcmc.set <- continue.tfr.mcmc(iter=auto.conf$iter.incr, output.dir=output.dir, nr.nodes=nr.nodes,
 										  parallel=parallel, verbose=verbose)
 				diag <- try(tfr.diagnose(sim.dir=output.dir, keep.thin.mcmc=TRUE, 
 							thin=auto.conf$thin, burnin=auto.conf$burnin,

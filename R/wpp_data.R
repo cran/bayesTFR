@@ -1,6 +1,6 @@
 # Read in the UN estimates
 
-set_wpp_regions <- function(start.year=1950, present.year=2005, wpp.year=2008, my.tfr.file=NULL, 
+set_wpp_regions <- function(start.year=1950, present.year=2010, wpp.year=2010, my.tfr.file=NULL, 
 							verbose=FALSE) {
 # outputs:
 # tfr_matrix_all, with each column one countries UN estimates
@@ -39,7 +39,7 @@ set_wpp_regions <- function(start.year=1950, present.year=2005, wpp.year=2008, m
 
 read.tfr.file <- function(file) return(read.delim(file=file, comment.char='#', check.names=FALSE))
 
-do.read.un.file <- function(un.file.name, wpp.year, my.file=NULL, present.year=2005, verbose=FALSE) {
+do.read.un.file <- function(un.file.name, wpp.year, my.file=NULL, present.year=2010, verbose=FALSE) {
 	cat('Reading file ', un.file.name, '.\n')
 	tfr_data <- read.tfr.file(file=un.file.name)
 	if(!is.element('last.observed', colnames(tfr_data)))
@@ -120,7 +120,7 @@ read.UNlocations <- function(data, wpp.year, package="bayesTFR", verbose=FALSE) 
 
 
 get.observed.time.matrix.and.regions <- function(data, loc_data, start.year=1950, 
-										present.year=2005) {
+										present.year=2010) {
 	tfr_data <- data
 	nr_countries <- length(tfr_data[,1])
 	names.tfr.data <- names(tfr_data)

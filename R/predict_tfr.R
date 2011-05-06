@@ -5,7 +5,7 @@ tfr.predict <- function(mcmc.set=NULL, end.year=2100,
 						save.as.ascii=1000, output.dir = NULL,
 						low.memory=TRUE,
 						# parameters for the AR1 stuff
-						mu=2.1, rho=0.9057, sigmaAR1=0.0922,
+						mu=2.1, rho=0.8859, sigmaAR1=0.1016,
 						seed=NULL, verbose=TRUE) {
 	if(!is.null(mcmc.set)) {
 		if (class(mcmc.set) != 'bayesTFR.mcmc.set') {

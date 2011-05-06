@@ -734,9 +734,9 @@ tfr.map <- function(pred, quantile=0.5, projection.year=NULL, par.name=NULL, adj
 }
 
 tfr.map.gvis <- function(pred, projection.year=NULL, quantile=0.5, pi=80, par.name=NULL, 
-							 html.file=NULL, adjusted=FALSE)
+							  adjusted=FALSE)
 	bdem.map.gvis(pred, projection.year=projection.year, 
-						quantile=quantile, pi=pi, par.name=par.name, html.file=html.file, adjusted=adjusted)
+						quantile=quantile, pi=pi, par.name=par.name, adjusted=adjusted)
 
 
 "bdem.map.gvis" <- function(pred, ...) UseMethod ("bdem.map.gvis")
@@ -744,11 +744,11 @@ tfr.map.gvis <- function(pred, projection.year=NULL, quantile=0.5, pi=80, par.na
 bdem.map.gvis.bayesTFR.prediction <- function(pred, projection.year=NULL, quantile=0.5, pi=80, 
 										par.name=NULL, html.file=NULL, adjusted=FALSE, ...) {
 	.do.gvis.bdem.map('TFR', 'BHM for Total Fertility Rate<br>', pred, projection.year=projection.year, 
-						quantile=quantile, pi=pi, par.name=par.name, html.file=html.file, adjusted=adjusted)
+						quantile=quantile, pi=pi, par.name=par.name, adjusted=adjusted)
 }
 
 .do.gvis.bdem.map <- function(what, title, pred, projection.year=NULL, quantile=0.5, pi=80, 
-									par.name=NULL, html.file=NULL, adjusted=FALSE) {
+									par.name=NULL, adjusted=FALSE) {
 	require(googleVis)
 	data(iso3166)
 	meta <- pred$mcmc.set$meta
@@ -768,13 +768,17 @@ bdem.map.gvis.bayesTFR.prediction <- function(pred, projection.year=NULL, quanti
 	if(!is.null(par.name)) what <- par.name
 	data[[what]] <- mapdata[unidx]
 	if(!is.null(lower)) { # confidence intervals defined
-		data$lower <- round(lower[unidx], 2)
-		data$upper <- round(upper[unidx], 2)
-		data$pi <- paste(iso3166[,'charcode'][unmatch][unidx], ': ', pi, '% CI (', data$lower, ', ', 
-				data$upper, ')', sep='')
+		lower.name <- paste('lower_', pi, sep='')
+		upper.name <- paste('upper_', pi, sep='')
+		data[[lower.name]] <- round(lower[unidx], 2)
+		data[[upper.name]] <- round(upper[unidx], 2)
+		data$pi <- paste(iso3166[,'charcode'][unmatch][unidx], ': ', pi, '% CI (', data[[lower.name]], ', ', 
+				data[[upper.name]], ')', sep='')
 		hovervar <- 'pi'
 	} else { # no confidence intervals
-		data$lower <- data$upper <- rep(NA, length(unidx))
+		lower.name <- 'lower'
+		upper.name <- 'upper'
+		data[[lower.name]] <- data[[upper.name]] <- rep(NA, length(unidx))
 		hovervar <- ''
 	}
 	col <- c('0x0000CC', '0x00CCFF', '0x33FF66', '0xFFFF66', '0xFF9900', '0xFF3300')
@@ -784,7 +788,7 @@ bdem.map.gvis.bayesTFR.prediction <- function(pred, projection.year=NULL, quanti
 
     #geo$html$caption <- paste(title, 'in', period,'<br>\n')
     geo$html$caption <- paste(title, period, .map.main.default(pred), quantile)
-    bdem.data <- data[,c('un', 'iso', 'name', what, 'lower', 'upper')]
+    bdem.data <- data[,c('un', 'iso', 'name', what, lower.name, upper.name)]
 	gvis.table <- gvisTable(bdem.data, 
 							options=list(width=600, height=600, page='disable', pageSize=198))
 	page <- list(type="MapTable", 
@@ -797,9 +801,6 @@ bdem.map.gvis.bayesTFR.prediction <- function(pred, projection.year=NULL, quanti
  					Footer=gvis.table$html$footer)
              )
 	class(page) <- list("gvis", class(page))
-	page.plot <- plot(page)
-	
-	if(!is.null(html.file)){
-		rspToHtml(page.plot$filename, outFile=html.file)
-	}
+	plot(page)
+	invisible(page)
 }

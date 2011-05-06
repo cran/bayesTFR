@@ -1,4 +1,4 @@
-\name{WPP2008_LOCATIONS}
+\name{WPP2010_LOCATIONS}
 \Rdversion{1.1}
 \alias{WPP2008_LOCATIONS}
 \alias{WPP2010_LOCATIONS}
@@ -7,9 +7,13 @@
 United Nations Table of Locations
 }
 \description{
-United Nations table of locations, including regions, as available in 2008.  It is stored in a TAB-separated ASCII file \dQuote{WPP2008_LOCATIONS.txt}.
+United Nations table of locations, including regions, as available in 2010 and 2008.  It is stored in TAB-separated ASCII files \dQuote{WPP2008_LOCATIONS.txt} and \dQuote{WPP2010_LOCATIONS.txt}.
 }
-\usage{data(WPP2008_LOCATIONS)}
+\usage{
+	data(WPP2008_LOCATIONS)
+	
+	data(WPP2010_LOCATIONS)
+	}
 \format{
   A data frame with one observations per country or region. It contains the following 8 variables:
   \describe{

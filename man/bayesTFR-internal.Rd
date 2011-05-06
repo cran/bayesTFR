@@ -121,6 +121,7 @@
 \alias{iso3166}
 \alias{proposal_cov_gammas_cii}
 \alias{UN2008_with_last_obs}
+\alias{UN2010_with_last_obs}
 	
 \title{
 Internal Functions and datasets of bayesTFR 

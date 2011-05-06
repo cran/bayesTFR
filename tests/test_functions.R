@@ -230,14 +230,14 @@ test.run.mcmc.simulation.auto <- function() {
 	test.name <- 'running auto MCMC'
 	start.test(test.name)
 	m <- run.tfr.mcmc(iter='auto', output.dir=sim.dir,
-					auto.conf=list(iter=10, nr.chains=2, thin=1, burnin=5))
-	stopifnot(get.total.iterations(m$mcmc.list, 0) == 60)
+					auto.conf=list(iter=10, iter.incr=5, max.loops=3, nr.chains=2, thin=1, burnin=5))
+	stopifnot(get.total.iterations(m$mcmc.list, 0) == 40)
 	test.ok(test.name)
 
 	test.name <- 'continuing auto MCMC'
 	start.test(test.name)
 	m <- continue.tfr.mcmc(iter='auto', output.dir=sim.dir, auto.conf=list(max.loops=2))
-	stopifnot(get.total.iterations(m$mcmc.list, 0) == 100)
+	stopifnot(get.total.iterations(m$mcmc.list, 0) == 60)
 	test.ok(test.name)
 
 	unlink(sim.dir, recursive=TRUE)
@@ -249,13 +249,14 @@ test.imputation <- function() {
 	# run MCMC
 	test.name <- 'running MCMC with missing values'
 	start.test(test.name)
-	my.tfr.file <- file.path(.find.package('bayesTFR'), 'data', 'UN2008_with_last_obs.txt')
+	my.tfr.file <- file.path(.find.package('bayesTFR'), 'data', 'UN2010_with_last_obs.txt')
 	m <- run.tfr.mcmc(iter=5, nr.chains=1, output.dir=sim.dir, my.tfr.file=my.tfr.file)
 	stopifnot(m$mcmc.list[[1]]$finished.iter == 5)
 	stopifnot(get.total.iterations(m$mcmc.list, 0) == 5)
 	stopifnot(identical(m, get.tfr.mcmc(sim.dir)))
 	# some countries are not DL because of the missing data
-	stopifnot(length(get.countries.index(m$meta)) != get.nr.countries(m$meta))
+	# This was the case in UN2008 but not in UN2010
+	# stopifnot(length(get.countries.index(m$meta)) != get.nr.countries(m$meta))
 	test.ok(test.name)
 	
 	test.name <- 'running projections with imputation'
