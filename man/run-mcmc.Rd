@@ -15,7 +15,7 @@ Runs (or continues running) MCMCs for simulating the total fertility rate of all
 run.tfr.mcmc(nr.chains = 3, iter = 62000, 
     output.dir = file.path(getwd(), "bayesTFR.output"), 
     thin = 1, replace.output = FALSE, 
-    start.year = 1950, present.year = 2010, wpp.year = 2008, 
+    start.year = 1950, present.year = 2010, wpp.year = 2010, 
     my.tfr.file = NULL, buffer.size = 100, 
     U.c.low = 5.5, U.up = 8.8, U.width = 3,
     mean.eps.tau0 = -0.25, sd.eps.tau0 = 0.4, nu.tau0 = 2, 
@@ -37,8 +37,8 @@ run.tfr.mcmc(nr.chains = 3, iter = 62000,
     proposal_cov_gammas = NULL,
     seed = NULL, parallel = FALSE, nr.nodes = nr.chains, 
     save.all.parameters = FALSE, 
-    auto.conf = list(max.loops=3, iter=62000, nr.chains=3, 
-    	thin=80, burnin=2000),
+    auto.conf = list(max.loops=5, iter=62000, iter.incr=10000, 
+        nr.chains=3, thin=80, burnin=2000),
     verbose = FALSE, ...)
 		
 continue.tfr.mcmc(iter, chain.ids=NULL, 
@@ -55,9 +55,9 @@ continue.tfr.mcmc(iter, chain.ids=NULL,
   \item{replace.output}{If \code{TRUE}, existing outputs in \code{output.dir} will be replaced by results of this simulation.}
   \item{start.year}{Start year for using historical data.}
   \item{present.year}{End year for using historical data.}
-  \item{wpp.year}{Year for which WPP data is available (see also \link{UN2008}).}
+  \item{wpp.year}{Year for which WPP data is available (see also \link{UN2010}).}
   \item{my.tfr.file}{File name containing user-specified TFR time series for one or more countries. It can include a subset of countries contained in the UN WPP file, as well as a set of new countries. In the former case,
-  	the function replaces the corresponding country data from the UN WPP file by values in this file. Only columns are replaced that match column names of the WPP file, and in addition, columns \sQuote{last.observed} and \sQuote{include_code} are used, if present. Countries are matched using the column \sQuote{country_code} (see also \link{UN2008}). In addition, in order the countries to be included in the simulation, in both cases (whether they are included in the UN TFR file or not), they must be contained in the UN table of locations and the \sQuote{include_code} in that table must be set to 2 (see \link{WPP2008_LOCATIONS}). If the column \sQuote{include_code} is present in \code{my.tfr.file}, its value overwrites the corresponding include code in the location file, unless is -1.  See also Details below.}
+  	the function replaces the corresponding country data from the UN WPP file by values in this file. Only columns are replaced that match column names of the WPP file, and in addition, columns \sQuote{last.observed} and \sQuote{include_code} are used, if present. Countries are matched using the column \sQuote{country_code} (see also \link{UN2008}). In addition, in order the countries to be included in the simulation, in both cases (whether they are included in the UN TFR file or not), they must be contained in the UN table of locations and the \sQuote{include_code} in that table must be set to 2 (see \link{WPP2010_LOCATIONS}). If the column \sQuote{include_code} is present in \code{my.tfr.file}, its value overwrites the corresponding include code in the location file, unless is -1.  See also Details below.}
   \item{buffer.size}{Buffer size (in number of iterations) for keeping data in the memory. The smaller the \code{buffer.size} the more often will the process access the hard disk and thus, the slower the run. On the other hand, the smaller the \code{buffer.size} the less data will be lost in case of failure.}
   \item{U.c.low, U.up}{Lower and upper bound of the parameter \eqn{U_c}, the start level of the fertility transition. The lower bound is set for each country as the maximum of \code{U.c.low} and the minimum of historical TFR for that country.}
   \item{U.width}{Width for slice sampling used when updating the \eqn{U_c} parameter.}
@@ -98,7 +98,7 @@ continue.tfr.mcmc(iter, chain.ids=NULL,
   \item{parallel}{Logical determining if the simulation should run multiple chains in parallel. If it is \code{TRUE}, the package \pkg{\link[snowFT]{snowFT}} is required.}
   \item{nr.nodes}{Relevant only if \code{parallel} is \code{TRUE}. It gives the number of nodes for running the simulation in parallel. By default it equals to the number of chains.}
   \item{save.all.parameters}{If \code{TRUE}, the distortion terms \eqn{\epsilon_{c,t}}{eps_ct} for all \eqn{t} are stored on disk, otherwise not.}
-  \item{auto.conf}{List containing a configuration for an \sQuote{automatic} run (see description of argument \code{iter}). Items \code{iter} and \code{nr.chains} are settings for each chunk of MCMC simulation; items \code{thin} and \code{burnin} are used in the convergence diagnostics following each chunk; \code{max.loops} controls the maximum number of chunks. All items must be integer values. This argument is only used if the function argument \code{iter} is set to \sQuote{auto}.}
+  \item{auto.conf}{List containing a configuration for an \sQuote{automatic} run (see description of argument \code{iter}). Item \code{iter} gives the number of iterations in the first chunk of the MCMC simulation; item \code{iter.incr} gives the number of iterations in the following chunks; \code{nr.chains} gives the number of chains in all chunks of the MCMC simulation; items \code{thin} and \code{burnin} are used in the convergence diagnostics following each chunk; \code{max.loops} controls the maximum number of chunks. All items must be integer values. This argument is only used if the function argument \code{iter} is set to \sQuote{auto}.}
   \item{verbose}{Logical switching log messages on and off.}
   \item{\dots}{Additional parameters to be passed to the function \code{\link[snowFT]{performParallel}}, if \code{parallel} is \code{TRUE}.}
   \item{chain.ids}{Array of chain identifiers that should be resumed. If it is \code{NULL}, all existing chains in \code{output.dir} are resumed.}
@@ -108,7 +108,7 @@ continue.tfr.mcmc(iter, chain.ids=NULL,
 	
 Using the function \code{continue.tfr.mcmc} one can continue simulating an existing MCMCs by \code{iter} iterations for either all or selected chains.
 
-For simulation of the hyperparameters of the Bayesian hierarchical model, all countries are used that are included in the UN WPP file (\link{UN2008}), possibly complemented by the \code{my.tfr.file}, that have \code{include_code} (in the UN location file) equal to 2. The hyperparameters are used to simulate country-specific parameters, which is done for all countries with \code{include_code} equal 1 or 2. Note that users can overwrite the UN include code by including the column \code{include_code} into the the \code{my.tfr.file}. The following values are recognized: -1 (do not overwrite the UN WPP include code), 0 (ignore), 1 (include in prediction but not estimation), 2 (include in both, estimation and prediction). Thus, the set of countries included in the estimation and prediction can be fully user-specific.
+For simulation of the hyperparameters of the Bayesian hierarchical model, all countries are used that are included in the UN WPP file (\link{UN2010}), possibly complemented by the \code{my.tfr.file}, that have \code{include_code} (in the UN location file) equal to 2. The hyperparameters are used to simulate country-specific parameters, which is done for all countries with \code{include_code} equal 1 or 2. Note that users can overwrite the UN include code by including the column \code{include_code} into the the \code{my.tfr.file}. The following values are recognized: -1 (do not overwrite the UN WPP include code), 0 (ignore), 1 (include in prediction but not estimation), 2 (include in both, estimation and prediction). Thus, the set of countries included in the estimation and prediction can be fully user-specific.
 
 }
 \value{

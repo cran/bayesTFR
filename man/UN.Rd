@@ -1,4 +1,4 @@
-\name{UN2008}
+\name{UN2010}
 \Rdversion{1.1}
 \alias{UN2008}
 \alias{UN2010}
@@ -8,9 +8,12 @@
 United Nations Time Series of the Total Fertility Rate
 }
 \description{
-Data set containing the United Nations time series of the total fertility rate for all countries of the world as available in 2008.  It is stored in a TAB-separated ASCII file \dQuote{UN2008.txt}.
+Data set containing the United Nations time series of the total fertility rate for all countries of the world as available in 2008 and 2010.  It is stored in a TAB-separated ASCII files \dQuote{UN2008.txt} and \dQuote{UN2010.txt}.
 }
-\usage{data(UN2008)}
+\usage{
+data(UN2010)
+data(UN2008)
+}
 
 \format{
   A data frame with 229 observations, one per country or region. It contains the following variables:
@@ -41,7 +44,7 @@ Data set containing the United Nations time series of the total fertility rate f
   }
 }
 \details{
-All entries in this data set must be included in the data set of locations, \code{\link{WPP2008_LOCATIONS}}. The two data sets are matched using the column \code{country_code}.
+All entries in \code{UN2008} and \code{UN2010}, respectively, must be included in the data set of locations, i.e. \code{\link{WPP2008_LOCATIONS}} and \code{\link{WPP2010_LOCATIONS}}, respectively. The the corresponding data set pair is matched using the column \code{country_code}.
 
 Regarding the time columns, only those are necessary that correspond to an earlier or equal time point than the value of the argument \code{present.year} passed to the function \code{\link{run.tfr.mcmc}}. Thus, if \code{present.year=2009}, all columns after \code{2005-2010} are not used.
 
@@ -50,7 +53,7 @@ Optionally, the data set can contain a column called \code{last.observed} contai
 The package contains also a data set called \sQuote{my_tfr_template} which is a template for user-specified TFR time series. It has the same structure, except that it can contain any subset of the set of the columns above. The only required column is \code{country_code} (see description of the argument \code{my.tfr.file} in \code{\link{run.tfr.mcmc}}).
 }
 \source{
-Data provided by the United Nations Population Division
+Data provided by the United Nations Population Division; see also \url{http://esa.un.org/unpd/wpp}.
 }
 %\references{
 %%  ~~ possibly secondary sources and usages ~~

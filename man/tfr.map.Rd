@@ -24,7 +24,7 @@ get.tfr.map.parameters(pred, tfr.range = NULL,
     nr.cats = 50, same.scale = TRUE, quantile = 0.5, \dots)
     
 tfr.map.gvis(pred, projection.year = NULL, quantile = 0.5, pi = 80, 
-    par.name = NULL, html.file = NULL, adjusted = FALSE)
+    par.name = NULL, adjusted = FALSE)
 }
 
 \arguments{
@@ -54,7 +54,6 @@ additional arguments to be passed to the \code{\link[rworldmap]{mapDevice}} func
 Arguments passed to the \code{\link[rworldmap]{mapCountryData}} function of the \pkg{rworldmap} package.
 }
 \item{pi}{Probability interval to be shown when a country is selected in an interactive map. The corresponding quantiles must be available (see argument \code{quantile} above).}
-\item{html.file}{Name of an HTML file in which the map is exported. If \code{NULL}, the map is not exported.}
 }
 \details{
 \code{tfr.map} creates a single map for a given projection period and quantile. \code{tfr.map.all} generates a sequence of maps, namely one for each projection period. If the package \pkg{fields} is installed, a color bar legend at the botom of the map is created.
