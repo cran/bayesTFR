@@ -1,6 +1,6 @@
 Package: bayesTFR
-Version: 1.4-0
-Date: 2011-05-06
+Version: 1.4-1
+Date: 2011-07-15
 Title: Bayesian Fertility Projection
 Author: Hana Sevcikova <hanas@uw.edu>, Leontine Alkema
         <alkema@nus.edu.sg>, Adrian Raftery <raftery@uw.edu>
@@ -13,6 +13,6 @@ Description: Making probabilistic projections of total fertility rate
 License: GPL (>= 2)
 URL: http://bayespop.csss.washington.edu
 LazyData: no
-Packaged: 2011-05-07 00:13:07 UTC; hana
+Packaged: 2011-07-15 17:14:48 UTC; hana
 Repository: CRAN
-Date/Publication: 2011-05-08 05:46:06
+Date/Publication: 2011-07-18 09:07:33

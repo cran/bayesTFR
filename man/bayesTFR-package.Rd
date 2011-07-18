@@ -15,8 +15,8 @@ using a Bayesian hierarchical model and the United Nations demographic time seri
 \details{
 \tabular{ll}{
 Package: \tab bayesTFR\cr
-Version: \tab 1.4-0\cr
-Date: \tab 2011-05-06\cr
+Version: \tab 1.4-1\cr
+Date: \tab 2011-07-15\cr
 Depends: \tab R (>= 2.9.0), mvtnorm, coda\cr
 Suggests: \tab rworldmap, fields, snowFT, googleVis \cr
 License: \tab GPL (>= 2)\cr
@@ -69,6 +69,11 @@ Hana Sevcikova <hanas@uw.edu>, Leontine Alkema <alkema@nus.edu.sg>, Adrian Rafte
 Maintainer: Hana Sevcikova <hanas@uw.edu>
 }
 \references{
+Hana Sevcikova, Leontine Alkema, Adrian E. Raftery (2011). bayesTFR: An
+  R Package for Probabilistic Projections of the Total Fertility Rate.
+  Journal of Statistical Software, 43(1), 1-29.
+  \url{http://www.jstatsoft.org/v43/i01/}.
+
 L. Alkema, A. E. Raftery, P. Gerland, S. J. Clark, F. Pelletier, Buettner, T.: 
 Probabilistic projections of the total fertility rate for all countries. Working Paper nr. 97, Center for Statistics and the Social Sciences, University of Washington. \url{http://www.csss.washington.edu/Papers}
 }
