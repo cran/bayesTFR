@@ -30,12 +30,11 @@ tfr.predict <- function(mcmc.set=NULL, end.year=2100,
 		diag.list <- get.tfr.convergence.all(mcmc.set$meta$output.dir)
 		ldiag <- length(diag.list)
 		if (ldiag == 0) stop('There is no diagnostics available. Use manual settings of "nr.traj" or "thin".')
-		use.nr.traj <- rep(NA, ldiag)
-		use.burnin <- rep(NA, ldiag)
+		use.nr.traj <- use.burnin <- rep(NA, ldiag)
 		for(idiag in 1:ldiag) {
 			if (has.mcmc.converged(diag.list[[idiag]])) {
-				use.nr.traj[idiag] <- diag$use.nr.traj
-				use.burnin[idiag] <- diag$burnin
+				use.nr.traj[idiag] <- diag.list[[idiag]]$use.nr.traj
+				use.burnin[idiag] <- diag.list[[idiag]]$burnin
 			}
 		}
 		if(all(is.na(use.nr.traj)))
@@ -43,8 +42,7 @@ tfr.predict <- function(mcmc.set=NULL, end.year=2100,
 		# Try to select those that suggest nr.traj >= 2000 (take the minimum of those)
 		traj.is.notna <- !is.na(use.nr.traj)
 		larger2T <- traj.is.notna & use.nr.traj>=2000
-		nr.traj.idx <- if(sum(larger2T)>0) which.min(use.nr.traj[larger2T])
-						else which.max(use.nr.traj[traj.is.notna])
+		nr.traj.idx <- if(sum(larger2T)>0) (1:ldiag)[larger2T][which.min(use.nr.traj[larger2T])] else (1:ldiag)[traj.is.notna][which.max(use.nr.traj[traj.is.notna])]
 		nr.traj <- use.nr.traj[nr.traj.idx]
 		burnin <- use.burnin[nr.traj.idx]
 		if(verbose)
@@ -458,28 +456,40 @@ make.tfr.prediction <- function(mcmc.set, end.year=2100, replace.output=FALSE,
 	invisible(bayesTFR.prediction)
 }
 
+get.ar1.countries <- function(meta) {
+	index <- get.ar1.countries.index(meta)
+	return(data.frame(country_name=meta$regions$country_name[index], country_code=meta$regions$country_code[index]))
+}
 
-get.ar1.parameters <- function(mu = 2.1, meta){  
-	tfr_prev <- tfr_now <- NULL
+get.ar1.countries.index <- function(meta) {
 	nr.countries <- get.nr.countries.est(meta)
-    for (country in seq(1, nr.countries)[meta$lambda_c[1:nr.countries]!=meta$T_end_c[1:nr.countries]]){  
+	return(seq(1, nr.countries)[meta$lambda_c[1:nr.countries]!=meta$T_end_c[1:nr.countries]])
+}
+
+get.ar1.data <- function(meta) {
+	tfr_prev <- tfr_now <- NULL
+    for (country in get.ar1.countries.index(meta)){  
 		tfr = meta$tfr_matrix_all[,country]
 		tfr_prev = c(tfr_prev, c(meta$tfr_matrix_all[meta$lambda_c[country]:(meta$T_end_c[country]-1),country] ))
 		tfr_now = c(tfr_now, c(meta$tfr_matrix_all[(meta$lambda_c[country]+1):meta$T_end_c[country],country] ))
 	}
-	yt <- tfr_now - mu
-	ytm1 <- tfr_prev - mu
-	mod = lm(yt~-1 +ytm1)
-	rho = mod$coeff[1]
-	sigmaAR1 = sqrt(sum(mod$residuals^2)/(length(tfr_now)-1))
-	tfr = ifelse(meta$tfr_matrix_all[,1:nr.countries]<=mu,meta$tfr_matrix_all[,1:nr.countries], NA)
-	sd_tot = sd(c(tfr, 2*mu-tfr), na.rm = TRUE)
-	#sigma.end = sd_tot*sqrt(1-rho^2)
-	return( #list(rho = round(rho,2), sigmaAR1 = round(sigmaAR1,2))
-			list(rho = rho, sigmaAR1 = sigmaAR1)
-				)
+	return(list(tfr_prev=tfr_prev, tfr_now=tfr_now, countries=get.ar1.countries(meta)))
 }
 
+get.ar1.parameters <- function(mu = 2.1, meta){
+	ar1data <- get.ar1.data(meta)
+	yt <- ar1data$tfr_now - mu
+	ytm1 <- ar1data$tfr_prev - mu
+	mod = lm(yt~-1 +ytm1)
+	rho = mod$coeff[1]
+	sigmaAR1 = sqrt(sum(mod$residuals^2)/(length(ar1data$tfr_now)-1))
+	#tfr = ifelse(meta$tfr_matrix_all[,1:nr.countries]<=mu,meta$tfr_matrix_all[,1:nr.countries], NA)
+	#sd_tot = sd(c(tfr, 2*mu-tfr), na.rm = TRUE)
+	#sigma.end = sd_tot*sqrt(1-rho^2)
+	return( #list(rho = round(rho,2), sigmaAR1 = round(sigmaAR1,2))
+			list(rho = rho, sigmaAR1 = sigmaAR1, mu=mu, data=ar1data)
+				)
+}
 
 remove.tfr.traces <- function(mcmc.set) {
 	for (i in 1:length(mcmc.set$mcmc.list)) {
@@ -562,7 +572,7 @@ get.tfr.periods <- function(meta) {
 	return (paste(mid.years-3, mid.years+2, sep='-'))
 }
 
-do.convert.trajectories <- function(pred, n, output.dir, verbose=FALSE) {
+do.convert.trajectories <- function(pred, n, output.dir, countries=NULL, verbose=FALSE) {
 	# Converts all trajectory rda files into UN ascii, selecting n trajectories by equal spacing.
 	if(n==0) return(NULL)
 	nr.simu <- pred$nr.traj
@@ -600,16 +610,17 @@ do.convert.trajectories <- function(pred, n, output.dir, verbose=FALSE) {
 	country.codes <- country.names <- c()
 	result.wide <- c()
 	header <- get.traj.ascii.header(pred$mcmc.set$meta)
-	for (country in 1:get.nr.countries(pred$mcmc.set$meta)) {
-		country.obj <- get.country.object(country, pred$mcmc.set$meta, index=TRUE)
+	convert.countries <- if(is.null(countries)) pred$mcmc.set$meta$regions$country_code else countries
+	for (country in convert.countries) {
+		country.obj <- get.country.object(country, pred$mcmc.set$meta)
 		if(verbose) cat('Converting trajectories for', country.obj$name, '(code', country.obj$code, ')\n')
 		trajectories <- get.trajectories(pred, country.obj$code)$trajectories
 		if (is.null(trajectories)) {
 			warning('No trajectories for ', country.obj$name, ' (code ', country.obj$code, ')')
 		} else {
+			append <- length(country.codes) > 0
 			country.codes <- c(country.codes, country.obj$code)
-			country.names <- c(country.names, country.obj$name)
-			append <- country > 1
+			country.names <- c(country.names, country.obj$name)			
 			result <- store.traj.ascii(trajectories, n, output.dir, country.obj$code, 
 							pred$mcmc.set$meta, index=index, append=append)
 			if(!append) {
@@ -696,7 +707,7 @@ do.write.parameters.summary <- function(pred, output.dir, revision=14, adjusted=
 								get.median.from.prediction(pred, country.obj$index, 
 												country.obj$code, adjusted=adjusted)[-1])
 		sink(con, type='message')
-		s <- summary(coda.mcmc.list(pred$mcmc.set, country=country.obj$code, 
+		s <- summary(coda.list.mcmc(pred$mcmc.set, country=country.obj$code, 
 					par.names=NULL, par.names.cs=tfr.parameter.names.cs(trans=FALSE), 
 					thin=1, burnin=0))
 		sink(type='message')

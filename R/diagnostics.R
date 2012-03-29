@@ -35,7 +35,7 @@ tfr.gelman.diag <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'),
 		if(verbose) 
 			cat('\n\tDiagnose country independent parameters.')
 		for (par.name in par.names) {
-			coda.mct0 <- coda.mcmc.list(mct0, rm.const.pars=TRUE, low.memory=TRUE, 
+			coda.mct0 <- coda.list.mcmc(mct0, rm.const.pars=TRUE, low.memory=TRUE, 
 								par.names=par.name, par.names.cs=NULL, burnin=t0, start=1, end=end)
 			npars <- ncol(coda.mct0[[1]])
 			if (!is.null(npars)) {
@@ -60,7 +60,7 @@ tfr.gelman.diag <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'),
 			if(verbose)
 				cat(par.name, ', ')
 			for (country in mct0$meta$id_DL) {
-				coda.mct0 <- coda.mcmc.list(mct0, rm.const.pars=TRUE, low.memory=TRUE, 
+				coda.mct0 <- coda.list.mcmc(mct0, rm.const.pars=TRUE, low.memory=TRUE, 
 									par.names=NULL, par.names.cs=par.name, 
 									country=get.country.object(country, mct0$meta)$code,
 									burnin=t0, start=1, end=end)
@@ -193,7 +193,7 @@ tfr.raftery.diag <- function(mcmc=NULL,
 	}
 	result.025 <- result.975 <- burnin.025 <- burnin.975 <- rd.025<- thin.ind.025 <- thin.ind.975 <- NULL
 	if (!is.null(par.names)) {
-		coda.mc <- coda.mcmc.list(mcmc.set, country=country, rm.const.pars=TRUE, low.memory=TRUE,
+		coda.mc <- coda.list.mcmc(mcmc.set, country=country, rm.const.pars=TRUE, low.memory=TRUE,
 						par.names=par.names, par.names.cs=NULL, burnin=burnin, ...
 						)
 		if(verbose) cat('\t\tProcessing raftery.diag(..., r=0.0125, q=0.025) for country-independent parameters\n')
@@ -222,7 +222,7 @@ tfr.raftery.diag <- function(mcmc=NULL,
 			country.obj <- get.country.object(country, mcmc.set$meta)
 			c.index <- country.obj$index
 		} else {
-			c.index <- 1:get.nr.countries.est(mcmc.set$meta)
+			c.index <- get.countries.index(mcmc.set$meta)
 			if(country.sampling.prop < 1) 
 				c.index <- sort(sample(c.index, size=round(length(c.index)*country.sampling.prop,0)))
 		}
@@ -230,7 +230,7 @@ tfr.raftery.diag <- function(mcmc=NULL,
 			cat('\t\tProcessing raftery.diag for country ')
 		for(country.idx in c.index) {
 			country.obj <- get.country.object(country.idx, mcmc.set$meta, index=TRUE)
-			coda.mc.cs <- coda.mcmc.list(mcmc.set, country=country.obj$code, 
+			coda.mc.cs <- coda.list.mcmc(mcmc.set, country=country.obj$code, 
 									rm.const.pars=TRUE, low.memory=TRUE,
 									par.names = NULL,
 									par.names.cs=par.names.cs, burnin=burnin, ...
@@ -536,4 +536,87 @@ thinindep <- function(x,q){
 		bic <- sum(2*(nij[idx]*(logn+lognij-logni-lognj))) - logn
 	}
 return(k)
+}
+
+tfr.GoF.dl <- function(sim.dir, pi=c(80,90,95), burnin=2000, verbose=TRUE) {
+	if(has.tfr.prediction(sim.dir=sim.dir)) {
+		pred <- get.tfr.prediction(sim.dir=sim.dir)
+		mcmc.set <- pred$mcmc.set
+		burnin = 0 # because the prediction mcmc.set is already burned and collapsed
+	} else mcmc.set <- get.tfr.mcmc(sim.dir)
+	return(.doGoF.dl(mcmc.set, pi=pi, burnin=burnin, verbose=verbose))
+}
+
+tfr.DLisDecrement <- function() {
+	return(TRUE)
+}
+
+.doGoF.dl <- function(mcmc.set, pi=c(80,90,95), type='tfr', burnin=0, verbose=TRUE) {
+	meta <- mcmc.set$meta
+	countries.index <- get.countries.index(meta)
+	data <- get.data.matrix(meta)
+	T.total <- nrow(data)
+	al.low <- (1 - pi/100)/2
+	al.high <- 1 - al.low
+	total.GoF <- rep(0, length(pi))
+	time.GoF <- matrix(0, nrow=length(pi), ncol=T.total-1)
+	country.GoF <- matrix(0, nrow=length(pi), ncol=max(countries.index))
+	total.mse <- 0
+	time.mse <- rep(0, T.total-1)
+	country.mse <- rep(0, max(countries.index))
+	counter <- matrix(0, ncol=max(countries.index), nrow=T.total-1)
+	if(verbose) cat('\nAssessing goodness of fit for country ')
+	for(icountry in countries.index) {
+		if(verbose) cat(icountry, ', ')
+		country.code <- meta$regions$country_code[icountry]
+		observed <- diff(data[1:T.total, icountry]) * if(do.call(paste(type,'.DLisDecrement', sep=''), list())) -1 else 1 
+		x <- data[1:(T.total - 1), icountry]
+		valid.time <- which(!is.na(observed))
+		if(length(valid.time) == 0) next
+		x <- x[valid.time]
+		observed <- observed[valid.time]
+		dlc <- do.call(paste(type,'.get.dlcurves', sep=''), 
+					list(x, mcmc.set$mcmc.list, country.code, icountry, burnin=burnin, 
+							nr.curves=2000, predictive.distr=TRUE))
+		counter[valid.time,icountry] <- counter[valid.time,icountry] + 1
+		for (i in 1:length(pi)) {
+        	dlpi <- apply(dlc, 2, quantile, c(al.low[i], al.high[i]))
+        	country.GoF[i,icountry] <- sum(observed >= dlpi[1,] & observed <= dlpi[2,])
+        	total.GoF[i] <- total.GoF[i] + country.GoF[i,icountry]
+        	for(itime in 1:length(valid.time)) {
+        		time.GoF[i,valid.time[itime]] <- time.GoF[i,valid.time[itime]] + (observed[itime] >= dlpi[1,itime] & observed[itime] <= dlpi[2,itime])
+        	}
+        }
+        dlmean <- apply(dlc, 2, mean)
+        country.mse[icountry] <- sum((observed-dlmean)^2)
+        total.mse <- total.mse + country.mse[icountry]
+        for(itime in 1:length(valid.time))
+        	time.mse[valid.time[itime]] <- time.mse[valid.time[itime]] + (observed[itime] - dlmean[itime])^2
+        
+	}
+	if(verbose) cat('\n')	
+	total.GoF <- total.GoF/sum(counter)
+	total.mse <- total.mse/sum(counter)
+	pi.names <- paste(pi, '%', sep='')
+	names(total.GoF) <- pi.names
+	names(total.mse) <- 'MSE'
+	rowsum.counter <- rowSums(counter)
+	for(row in 1:nrow(time.GoF)) {
+		time.GoF[row,] <- time.GoF[row,]/rowsum.counter
+	}
+	time.mse <- time.mse/rowsum.counter
+	dimnames(time.GoF) <- list(pi.names, rownames(data)[2:T.total])
+	names(time.mse) <- rownames(data)[2:T.total]
+	colsum.counter <- colSums(counter)
+	for(row in 1:nrow(country.GoF)) {
+		country.GoF[row,] <- country.GoF[row,]/colsum.counter
+	}
+	country.mse <- country.mse/colsum.counter
+	dimnames(country.GoF) <- list(pi.names, meta$regions$country_code[1:max(countries.index)])
+	names(country.mse) <- meta$regions$country_code[1:max(countries.index)]
+	country.GoF[is.nan(country.GoF)] <- NA
+	country.mse[is.nan(country.mse)] <- NA
+	if(verbose) cat('Done.\n')
+	return(list(total.gof=total.GoF, time.gof=time.GoF, country.gof=country.GoF,
+				total.mse=total.mse, time.mse=time.mse, country.mse=country.mse))
 }

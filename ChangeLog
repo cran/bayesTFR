@@ -1,7 +1,33 @@
-1.4-1 (07/15/2011)
+1.5-1 (03/29/2012)
 -----
-Citation and reference to a JSS article added.
+Example data reduced from three chains of 50 iterations each to two chains of 30 iterations each in order to make the package smaller.
 
+Rename coda.mcmc.list to coda.list.mcmc in order not to intervene with the S3 method coda.mcmc.
+
+Arguments typical.trajectory, col, lwd, show.legend added to tfr.trajectories.plot.
+
+Function tfr.GoF.dl added to compute goodness of fit.
+
+Argument 'predictive.distr' addedto the DLcurve.plot function to plot the double logistic curves including the error term.
+
+1.5-0 (11/17/2011)
+-----
+Performance improved in two ways:
+1. MCMCs are converted to environments (instead of being lists), so that they are not copied every time.
+2. A few functions implemented in C.
+
+1.4-2 (10/13/2011)
+-----
+Minor changes in get.prediction.summary.data.
+
+Internal changes in the function for plotting world maps.
+
+New function called get.countries.table added.
+
+1.4-1 (07/15/2011)
+-----   
+Citation and reference to a JSS	article	added.
+	
 1.4-0 (05/06/2011)
 -----
 Official UN WPP 2010 data added to the package and the default for argument wpp.year set to 2010. 

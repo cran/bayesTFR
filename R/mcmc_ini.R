@@ -3,12 +3,15 @@ DLcurve <- function(DLpar, tfr, p1, p2){
  # gives the DL-decrement
  # DLpar is c(Delta1, Delta2, Delta3, Delta4, d_c)
  # tfr is a vector for which the decrements for this curve need to  	be calculated
-    t_mid1 <- DLpar[4] + DLpar[3] + DLpar[2] + 0.5 * DLpar[1]
-    t_mid3 <- DLpar[4] + 0.5 * DLpar[3]
-    DLcurve <- 5 * DLpar[5] * (-1/(1 + exp(-log(p1^2)/DLpar[1] * 
-        (tfr - t_mid1))) + 1/(1 + exp(-log(p2^2)/DLpar[3] * (tfr - 
-        t_mid3))))
-    return(ifelse((DLcurve < 0)|(tfr <= 1), 0, DLcurve))
+ 	dlvalue <- rep(0.0, length(tfr))
+	res <- .C("doDLcurve", as.numeric(DLpar), as.numeric(tfr), p1, p2, length(tfr), dl_values=dlvalue)
+	return(res$dl_values)
+#    t_mid1 <- DLpar[4] + DLpar[3] + DLpar[2] + 0.5 * DLpar[1]
+#    t_mid3 <- DLpar[4] + 0.5 * DLpar[3]
+#    DLcurve <- 5 * DLpar[5] * (-1/(1 + exp(-log(p1^2)/DLpar[1] * 
+#        (tfr - t_mid1))) + 1/(1 + exp(-log(p2^2)/DLpar[3] * (tfr - 
+#        t_mid3))))
+#    return(ifelse((DLcurve < 0)|(tfr <= 1), 0, DLcurve))
 
 }
 
@@ -18,12 +21,16 @@ DLcurve <- function(DLpar, tfr, p1, p2){
 # (because rest is NA!!)
 get_eps_T = function (DLpar, country, tfr_matrix, start, lambda, p1, p2) 
 {
-    eps_T <- NULL
-    for (t in start:(lambda - 1)) {
-        eps_T <- c(eps_T, tfr_matrix[t + 1, country] - tfr_matrix[t, 
-            country] + DLcurve(DLpar, tfr_matrix[t, country], 
-            p1, p2))
-    }
+#    eps_T <- NULL
+    tfr <- tfr_matrix[start:lambda, country]
+    ldl <- length(tfr)-1
+    dl <- DLcurve(DLpar, tfr[1:ldl], p1, p2)
+#    for (t in start:(lambda - 1)) {
+#        eps_T <- c(eps_T, tfr_matrix[t + 1, country] - tfr_matrix[t, 
+#            country] + DLcurve(DLpar, tfr_matrix[t, country], 
+#            p1, p2))
+#    }
+    eps_T <- tfr[2:(ldl+1)] - tfr[1:ldl] + dl
     return(eps_T)
 }
 

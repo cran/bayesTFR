@@ -103,7 +103,9 @@ store.mcmc <- local({
 						get.country.object(country, meta=mcmc$meta, index=TRUE)$code, mode=open)
 			}
 		}
-		store.bayesTFR.object(mcmc, output.dir)
+		resmc <- as.list(mcmc)
+		class(resmc) <- 'bayesTFR.mcmc'
+		store.bayesTFR.object(resmc, output.dir)
 	}
 	
 	store <- function(mcmc, append=FALSE, flush.buffer=FALSE, countries=NULL, verbose=FALSE) {
