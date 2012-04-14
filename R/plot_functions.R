@@ -29,8 +29,50 @@ stop.if.country.not.DL <- function(country.obj, meta) {
     	stop('Country ', country.obj$name, ' not estimated because no decline observed.')
 }
 
+tfr.get.dlcurves <- function(x, mcmc.list, country.code, country.index, burnin, nr.curves, predictive.distr=FALSE) {
+    dlc <- c()
+    U.var <- paste("U_c", country.code, sep = "")
+    d.var <- paste("d_c", country.code, sep = "")
+    Triangle_c4.var <- paste("Triangle_c4_c", country.code, sep = "")
+    gamma.vars <- paste("gamma_", 1:3, "_c", country.code, sep = "")
+    # Compute the quantiles on a sample of at least 2000.   
+    nr.curves.from.mc <- if (!is.null(nr.curves)) ceiling(max(nr.curves, 2000)/length(mcmc.list))
+    						else NULL
+    for (mcmc in mcmc.list) {
+    	th.burnin <- get.thinned.burnin(mcmc,burnin)
+    	thincurves.mc <- get.thinning.index(nr.points=nr.curves.from.mc, 
+            all.points=mcmc$length - th.burnin)
+        traces <- load.tfr.parameter.traces.cs(mcmc, country.code, 
+        						burnin=th.burnin, 
+								thinning.index=thincurves.mc$index)
+        theta <- (traces[, U.var] - traces[, Triangle_c4.var] ) * 
+            exp(traces[, gamma.vars, drop=FALSE])/apply(exp(traces[,gamma.vars, drop=FALSE]), 1, sum)
+        theta <- cbind(theta, traces[, Triangle_c4.var], traces[, d.var])
+        dl <- t(apply(theta, 1, DLcurve, tfr = x, p1 = mcmc$meta$dl.p1, p2 = mcmc$meta$dl.p2))
+        if(length(x) == 1) dl <- t(dl)
+        if(predictive.distr) {
+			errors <- matrix(NA, nrow=dim(dl)[1], ncol=dim(dl)[2])
+			wp.traces <- load.tfr.parameter.traces(mcmc, 
+        						burnin=th.burnin, 
+								thinning.index=thincurves.mc$index,
+								par.names=c('sigma0', 'S_sd', 'a_sd', 'b_sd'))
+  			#sigma_eps <- pmax(sigma_eps, mcmc$meta$sigma0.min)
+			n <- ncol(errors)
+			for(i in 1:nrow(errors)) {
+				sigma_eps <- pmax(wp.traces[i,'sigma0'] + (x - wp.traces[i,'S_sd'])*
+  						ifelse(x > wp.traces[i,'S_sd'], -wp.traces[i,'a_sd'], wp.traces[i,'b_sd']),
+  						mcmc$meta$sigma0.min)
+				errors[i,] <- rnorm(n, mean=0, sd=sigma_eps)
+			}
+        	dlc <- rbind(dlc, dl+errors)
+        } else dlc <- rbind(dlc, dl)
+    }
+    
+    return (dlc)
+}
+
 DLcurve.plot <- function (mcmc.list, country, burnin = NULL, pi = 80, tfr.max = 10, 
-    nr.curves = NULL, ylim = NULL, xlab = "TFR (reversed)", ylab = "TFR decrement", 
+    nr.curves = NULL, predictive.distr=FALSE, ylim = NULL, xlab = "TFR (reversed)", ylab = "TFR decrement", 
     main = NULL, ...
     ) 
 {	
@@ -45,28 +87,8 @@ DLcurve.plot <- function (mcmc.list, country, burnin = NULL, pi = 80, tfr.max = 
     country <- get.country.object(country, meta)
     stop.if.country.not.DL(country, meta)
     tfr_plot <- seq(0, tfr.max, 0.1)
-    dlc <- c()
-    U.var <- paste("U_c", country$code, sep = "")
-    d.var <- paste("d_c", country$code, sep = "")
-    Triangle_c4.var <- paste("Triangle_c4_c", country$code, sep = "")
-    gamma.vars <- paste("gamma_", 1:3, "_c", country$code, sep = "")
-    # Compute the quantiles on a sample of at least 2000.   
-    nr.curves.from.mc <- if (!is.null(nr.curves)) ceiling(max(nr.curves, 2000)/length(mcmc.list))
-    						else NULL
-    for (mcmc in mcmc.list) {
-    	th.burnin <- get.thinned.burnin(mcmc,burnin)
-    	thincurves.mc <- get.thinning.index(nr.points=nr.curves.from.mc, 
-            all.points=mcmc$length - th.burnin)
-        traces <- load.tfr.parameter.traces.cs(mcmc, country$code, 
-        						burnin=th.burnin, 
-								thinning.index=thincurves.mc$index)
-        theta <- (traces[, U.var] - traces[, Triangle_c4.var] ) * 
-            exp(traces[, gamma.vars, drop=FALSE])/apply(exp(traces[,gamma.vars, drop=FALSE]), 1, sum)
-        theta <- cbind(theta, traces[, Triangle_c4.var], 
-            traces[, d.var])
-        dlc <- rbind(dlc, t(apply(theta, 1, DLcurve, tfr = tfr_plot, 
-            p1 = mcmc$meta$dl.p1, p2 = mcmc$meta$dl.p2)))
-    }
+    dlc <- tfr.get.dlcurves(tfr_plot, mcmc.list, country$code, country$index, burnin, nr.curves, 
+    						predictive.distr=predictive.distr)
     miny <- min(dlc)
     maxy <- max(dlc)
     decr <- -diff(meta$tfr_matrix[1:meta$T_end, country$index])
@@ -145,16 +167,23 @@ tfr.trajectories.table <- function(tfr.pred, country, pi=c(80, 95), half.child.v
 	return(rbind(cbind(tfr, matrix(NA, nrow=nrow(tfr), ncol=ncol(pred.table)-1)), pred.table))
 }
 
-get.trajectories <- function(tfr.pred, country, nr.traj=NULL, adjusted=TRUE) {
-	traj.file <- file.path(tfr.pred$output.dir, paste('traj_country', country, '.rda', sep=''))
-	if (file.exists(traj.file)) {
-		load(traj.file)
+get.typical.trajectory.index <- function(trajectories) {
+	med <- apply(trajectories, 1, median)
+	sumerrors <- apply(abs(trajectories - med), 2, sum)
+	sorterrors <- order(sumerrors)
+	return(sorterrors[round(length(sorterrors)/2, 0)])
+}
+
+get.trajectories <- function(tfr.pred, country, nr.traj=NULL, adjusted=TRUE, base.name='traj', typical.trajectory=FALSE) {
+	traj.file <- file.path(tfr.pred$output.directory, paste(base.name, '_country', country, '.rda', sep=''))
+	if (!file.exists(traj.file)) return(list(trajectories=NULL))
+	load(traj.file)
+	if(typical.trajectory) {
+		traj.idx <- get.typical.trajectory.index(trajectories)
+	} else {
 		thintraj <- get.thinning.index(nr.traj, dim(trajectories)[2]) 
 		if (thintraj$nr.points == 0) return(list(trajectories=NULL))
 		traj.idx <- thintraj$index
-	} else {
-		trajectories <- NULL
-		traj.idx <- NULL
 	}
 	if(!is.null(trajectories)) {
 		if(adjusted) {
@@ -232,25 +261,38 @@ tfr.trajectories.plot.all <- function(tfr.pred,
 		cat('\nTrajectory plots stored into', output.dir, '\n')
 }
 
-get.half.child.variant <- function(median) {
+get.half.child.variant <- function(median, increment=c(0, 0.25, 0.4, 0.5)) {
 	l <- length(median)
-	increment <- c(0, 0.25, 0.4, 0.5)
+	lincr <- length(increment)
 	upper <- lower <- c()
 	for (i in 1:l) {
-		upper <- c(upper, median[i]+increment[min(i,4)])
-		lower <- c(lower, median[i]-increment[min(i,4)])
+		upper <- c(upper, median[i]+increment[min(i,lincr)])
+		lower <- c(lower, median[i]-increment[min(i,lincr)])
 	}
 	return(rbind(lower, upper))	
 }
 
 tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95), 
 								  half.child.variant=TRUE, nr.traj=NULL,
-								  adjusted.only = TRUE,
+								  adjusted.only = TRUE, typical.trajectory=FALSE,
 								  xlim=NULL, ylim=NULL, type='b', 
-								  xlab='Year', ylab='TFR', main=NULL, ...
+								  xlab='Year', ylab='TFR', main=NULL, lwd=c(2,2,2,2,2,1), 
+								  col=c('black', 'green', 'red', 'red', 'blue', 'gray'),
+								  show.legend=TRUE, ...
 								  ) {
+	# lwd/col is a vector of 6 line widths/colors for: 
+	#	1. observed data, 2. imputed missing data, 3. median, 4. quantiles, 5. +- 0.5 child, 6. trajectories
 	if (missing(country)) {
 		stop('Argument "country" must be given.')
+	}
+	if(length(lwd) < 6) {
+		lwd <- rep(lwd, 6)
+		lwd[6] <- 1
+	}
+	if(length(col) < 6) {
+		lcol <- length(col)
+		col <- rep(col, 6)
+		col[(lcol+1):6] <- c('black', 'green', 'red', 'red', 'blue', 'gray')[(lcol+1):6]
 	}
 	country <- get.country.object(country, tfr.pred$mcmc.set$meta)
 	tfr_observed <- tfr.pred$mcmc.set$meta$tfr_matrix_observed
@@ -266,77 +308,78 @@ tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95),
 	if (lpart2 > 0) 
 		y1.part2 <- tfr_matrix_reconstructed[(T_end_c[country$index]+1):nrow(tfr_matrix_reconstructed),country$index]
 
-	trajectories <- get.trajectories(tfr.pred, country$code, nr.traj)
+	trajectories <- get.trajectories(tfr.pred, country$code, nr.traj, typical.trajectory=typical.trajectory)
 	if(is.null(xlim)) xlim <- c(min(x1,x2), max(x1,x2))
 	if(is.null(ylim)) ylim <- c(0, max(trajectories$trajectories, y1.part1, y1.part2, na.rm=TRUE))
 	if(is.null(main)) main <- country$name
 	# plot historical data: observed
 	plot(x1[1:lpart1], y1.part1, type=type, xlim=xlim, ylim=ylim, ylab=ylab, xlab=xlab, main=main, 
-					panel.first = grid(), lwd=2, ...
+					panel.first = grid(), lwd=lwd[1], col=col[1], ...
 					)
 	if(lpart2 > 0) { # imputed values
-		lines(x1[(lpart1+1): length(x1)], y1.part2, pch=2, type='b', col='green', lwd=2)
-		lines(x1[lpart1:(lpart1+1)], c(y1.part1[lpart1], y1.part2[1]), col='green', lwd=2) # connection between the two parts
+		lines(x1[(lpart1+1): length(x1)], y1.part2, pch=2, type='b', col=col[2], lwd=lwd[2])
+		lines(x1[lpart1:(lpart1+1)], c(y1.part1[lpart1], y1.part2[1]), col=col[2], lwd=lwd[2]) # connection between the two parts
 	}
 	
 	# plot trajectories
 	if(!is.null(trajectories$trajectories)) { 
 		for (i in 1:length(trajectories$index)) {
-			lines(x2, trajectories$trajectories[,trajectories$index[i]], type='l', col='gray')
+			lines(x2, trajectories$trajectories[,trajectories$index[i]], type='l', col=col[6], lwd=lwd[6])
 		}
 	}
 	# plot median
 	tfr.median <- get.median.from.prediction(tfr.pred, country$index, country$code)
-	lines(x2, tfr.median, type='l', col='red', lwd=2) 
+	lines(x2, tfr.median, type='l', col=col[3], lwd=lwd[3]) 
 	# plot given CIs
 	lty <- 2:(length(pi)+1)
 	for (i in 1:length(pi)) {
 		cqp <- get.traj.quantiles(tfr.pred, country$index, country$code, trajectories$trajectories, pi[i])
 		if (!is.null(cqp)) {
-			lines(x2, cqp[1,], type='l', col='red', lty=lty[i], lwd=2)
-			lines(x2, cqp[2,], type='l', col='red', lty=lty[i], lwd=2)
+			lines(x2, cqp[1,], type='l', col=col[4], lty=lty[i], lwd=lwd[4])
+			lines(x2, cqp[2,], type='l', col=col[4], lty=lty[i], lwd=lwd[4])
 		}
 	}
 	legend <- c()
-	col <- c()
-	lwd <- c()
+	cols <- c()
+	lwds <- c()
 	lty <- c(1, lty)
 	if(!adjusted.only) { # plot unadjusted median
 		bhm.median <- get.median.from.prediction(tfr.pred, country$index, country$code, adjusted=FALSE)
-		lines(x2, bhm.median, type='l', col='black', lwd=2)
+		lines(x2, bhm.median, type='l', col=col[3], lwd=lwd[3], lty=max(lty)+1)
 		legend <- c(legend, 'BHM median')
-		col <- c(col, 'black')
-		lwd <- c(lwd, 2)
-		lty <- c(1, lty)
+		cols <- c(cols, col[3])
+		lwds <- c(lwds, lwd[3])
+		lty <- c(max(lty)+1, lty)
 	}
 	median.legend <- if(adjusted.only) 'median' else 'adj. median'
-	legend <- c(legend, median.legend, paste('PI', pi))
-	col <- c(col, rep('red', length(pi)+1))
-	lwd <- c(lwd, rep(2, length(pi)+1))
+	legend <- c(legend, median.legend, paste(pi, '% PI', sep=''))
+	cols <- c(cols, col[3], rep(col[4], length(pi)))
+	lwds <- c(lwds, lwd[3], rep(lwd[4], length(pi)))
 	if (half.child.variant) {
 		lty <- c(lty, max(lty)+1)
 		llty <- length(lty)
 		up.low <- get.half.child.variant(median=tfr.median)
-		lines(x2, up.low[1,], type='l', col='blue', lty=lty[llty], lwd=2)
-		lines(x2, up.low[2,], type='l', col='blue', lty=lty[llty], lwd=2)
+		lines(x2, up.low[1,], type='l', col=col[5], lty=lty[llty], lwd=lwd[5])
+		lines(x2, up.low[2,], type='l', col=col[5], lty=lty[llty], lwd=lwd[5])
 		legend <- c(legend, '+/- 0.5 child')
-		col <- c(col, 'blue')
-		lwd <- c(lwd, 2)
+		cols <- c(cols, col[5])
+		lwds <- c(lwds, lwd[5])
 	}
 
 	legend <- c(legend, 'observed TFR')
-	col <- c(col, 'black')
+	cols <- c(cols, col[1])
 	lty <- c(lty, 1)
 	pch <- c(rep(-1, length(legend)-1), 1)
-	lwd <- c(lwd, 2)
+	lwds <- c(lwds, lwd[1])
 	if(lpart2 > 0) {
 		legend <- c(legend, 'imputed TFR')
-		col <- c(col, 'green')
+		cols <- c(cols, col[2])
 		lty <- c(lty, 1)
 		pch <- c(pch, 2)
-		lwd <- c(lwd, 2)
+		lwds <- c(lwds, lwd[2])
 	}
-	legend('bottomleft', legend=legend, lty=lty, bty='n', col=col, pch=pch, lwd=lwd)
+	if(show.legend)
+		legend('bottomleft', legend=legend, lty=lty, bty='n', col=cols, pch=pch, lwd=lwds)
 	#abline(h=1, lty=3)
 	#abline(h=1.5, lty=3)
 	#abline(h=2.1, lty=3)
@@ -631,8 +674,10 @@ par.names.for.worldmap.bayesTFR.prediction <- function(pred, ...) {
 	return(c('lambda', tfr.parameter.names.cs.extended()))
 }
 
-get.data.for.worldmap <- function(pred, quantile=0.5, projection.year=NULL, par.name=NULL, 
-									adjusted=FALSE, projection.index=1, pi=NULL) {
+"get.data.for.worldmap" <- function(pred, ...) UseMethod ("get.data.for.worldmap")
+
+get.data.for.worldmap.bayesTFR.prediction <- function(pred, quantile=0.5, projection.year=NULL, par.name=NULL, 
+									adjusted=FALSE, projection.index=1, pi=NULL, ...) {
 	meta <- pred$mcmc.set$meta
 	quantiles <- quantile
 	if (!is.null(pi)) {
@@ -663,7 +708,7 @@ get.data.for.worldmap <- function(pred, quantile=0.5, projection.year=NULL, par.
 			for (country in get.countries.index(meta)) {
 				country.obj <- get.country.object(country, meta, index=TRUE)
 				sink(con, type='message')
-				s <- summary(coda.mcmc.list(pred$mcmc.set, country=country.obj$code, 
+				s <- summary(coda.list.mcmc(pred$mcmc.set, country=country.obj$code, 
 						par.names=NULL, par.names.cs=par.name, thin=1, burnin=0), quantiles = quantiles)
 				sink(type='message')
 				data <- rbind(data, s$quantiles)
@@ -716,8 +761,7 @@ tfr.map <- function(pred, quantile=0.5, projection.year=NULL, par.name=NULL, adj
 					projection.index=1,  device='dev.new', main=NULL, device.args=NULL, ...
 				) {
 	require(rworldmap)
-	meta <- pred$mcmc.set$meta
-	data.period <- bayesTFR:::get.data.for.worldmap(pred, quantile, projection.year=projection.year, 
+	data.period <- get.data.for.worldmap(pred, quantile, projection.year=projection.year, 
 									par.name=par.name, adjusted=adjusted, projection.index=projection.index)
 	data <- data.period$data
 	period <- data.period$period
@@ -752,7 +796,7 @@ bdem.map.gvis.bayesTFR.prediction <- function(pred, projection.year=NULL, quanti
 	require(googleVis)
 	data(iso3166)
 	meta <- pred$mcmc.set$meta
-	data.period <- bayesTFR:::get.data.for.worldmap(pred, quantile, projection.year=projection.year, 
+	data.period <- get.data.for.worldmap(pred, quantile, projection.year=projection.year, 
 									par.name=par.name, projection.index=1, adjusted=adjusted, pi=pi)
 	mapdata <- data.period$data
 	period <- data.period$period

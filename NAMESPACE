@@ -1,3 +1,6 @@
+#exportPattern("^[[:alpha:]]+")
+useDynLib(bayesTFR)
+
 # export functions
 export(
 	run.tfr.mcmc,
@@ -33,7 +36,7 @@ export(
 	get.tfr.parameter.traces.cs,
 	get.tfr.trajectories,
 	coda.mcmc,
-	coda.mcmc.list,
+	coda.list.mcmc,
 	get.cov.gammas,
 	get.country.object,
 	country.names,
@@ -54,6 +57,8 @@ export(
 	tfr.plot.gelman,
 	tfr.raftery.diag,
 	tfr.diagnose,
+	tfr.get.dlcurves,
+	tfr.GoF.dl,
 	get.median.from.prediction,
 	bdem.parameter.traces,
 	get.traj.ascii.header,
@@ -70,7 +75,9 @@ export(
 	bdem.map.gvis,
 	tfr.map.gvis,
 	get.mcmc.meta,
-	par.names.for.worldmap
+	par.names.for.worldmap,
+	get.data.for.worldmap,
+	get.countries.table
 )
 
 # register S3 methods
@@ -109,3 +116,6 @@ S3method(.get.gamma.pars, bayesTFR.prediction)
 S3method(.map.main.default, bayesTFR.prediction)
 S3method(bdem.map.gvis, bayesTFR.prediction)
 S3method(par.names.for.worldmap, bayesTFR.prediction)
+S3method(get.data.for.worldmap, bayesTFR.prediction)
+S3method(get.countries.table, bayesTFR.prediction)
+S3method(get.countries.table, bayesTFR.mcmc.set)

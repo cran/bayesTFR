@@ -36,7 +36,7 @@ mcmc.update.abS <- function(what, eps_Tc_temp, mcmc) {
                                          mcmc$meta$const_sd_dummie_Tc, mcmc$meta$sigma0.min) >= z) {
                         mcmc[[var.name]] <- var_prop
                         mcmc$add_to_sd_Tc <- add_to_sd_Tc_prop
-                        return(mcmc)
+                        return()
                 } else {
                         # shrink interval
                         if (var_prop < var.value){
@@ -70,7 +70,7 @@ mcmc.update.sigma0const <- function(what, log.like.func, eps_Tc_temp, mcmc) {
                 if (eval(call(log.like.func, mcmc$add_to_sd_Tc, var.values[['const']], var.values[['sigma0']], 
                                  eps_Tc_temp, mcmc$meta$const_sd_dummie_Tc, mcmc$meta$sigma0.min)) >= z) {
                         mcmc[[var.name]] <- var_prop
-                        return(mcmc)
+                        return()
                 } else {
                         # shrink interval
                         if (var_prop < var.value){
@@ -100,16 +100,14 @@ mcmc.update.abSsigma0const <- function(mcmc, id.not.early.index) {
 	# put NAs on tau_c spots for id_not_early countries
 	eps_Tc_temp[id.not.early.index] <- NA
 	
-    mcmc <- mcmc.update.abS('a', eps_Tc_temp, mcmc)
-    mcmc <- mcmc.update.abS('b', eps_Tc_temp, mcmc)
-    mcmc <- mcmc.update.abS('S', eps_Tc_temp, mcmc)
-    mcmc <- mcmc.update.sigma0const('sigma0', 'log_cond_sigma0', eps_Tc_temp, mcmc)
-    mcmc <- mcmc.update.sigma0const('const', 'log_cond_const_sd', eps_Tc_temp, mcmc)
+    mcmc.update.abS('a', eps_Tc_temp, mcmc)
+    mcmc.update.abS('b', eps_Tc_temp, mcmc)
+    mcmc.update.abS('S', eps_Tc_temp, mcmc)
+    mcmc.update.sigma0const('sigma0', 'log_cond_sigma0', eps_Tc_temp, mcmc)
+    mcmc.update.sigma0const('const', 'log_cond_const_sd', eps_Tc_temp, mcmc)
     mcmc$sd_Tc <- ifelse(mcmc$meta$const_sd_dummie_Tc==1, mcmc$const_sd, 1)*
             ifelse((mcmc$sigma0 + mcmc$add_to_sd_Tc)>0, mcmc$sigma0 + mcmc$add_to_sd_Tc, 
             mcmc$meta$sigma0.min)
-
-    return(mcmc) 
 }
 
 ##############################################################################
@@ -119,13 +117,20 @@ mcmc.update.Triangle_c4 <- function(country, mcmc) {
 # (thus also lambda_c and the NAs in the eps!)
         Triangle_c4_trans <- log((mcmc$Triangle_c4[country] - mcmc$meta$Triangle_c4.low)/
                         (mcmc$meta$Triangle_c4.up - mcmc$Triangle_c4[country]))
-        z <- (log_cond_Triangle_c4_trans(Triangle_c4_trans, 
-                mcmc$eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1),country],
-                mcmc$sd_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1),country],
-                mcmc$mean_eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1),country],
-                                mcmc$Triangle4, mcmc$delta4)
-                - rexp(1))
-
+        epsT.idx <- mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1)
+        lepsT.idx <- length(epsT.idx)
+#        z <- (log_cond_Triangle_c4_trans(Triangle_c4_trans, 
+#                mcmc$eps_Tc[epsT.idx,country],
+#                mcmc$sd_Tc[epsT.idx,country],
+#                mcmc$mean_eps_Tc[epsT.idx,country], mcmc$Triangle4, mcmc$delta4) - rexp(1))
+        log_cond <- 0.0
+        logcondt <- .C("log_cond_Triangle_c4_trans", Triangle_c4_trans, 
+                mcmc$eps_Tc[epsT.idx,country],
+                mcmc$sd_Tc[epsT.idx,country],
+                mcmc$mean_eps_Tc[epsT.idx,country],
+                lepsT.idx, mcmc$Triangle4, mcmc$delta4, log_cond=log_cond)
+        z <-  logcondt$log_cond - rexp(1)
+#		stop('')
         v <- runif(1)
 
         interval <- c(Triangle_c4_trans - v*mcmc$meta$Triangle_c4.trans.width, 
@@ -142,15 +147,15 @@ mcmc.update.Triangle_c4 <- function(country, mcmc) {
                                                 mcmc$d_c[country])
                   eps_T_prop <- get_eps_T(theta_prop,country, mcmc$meta$tfr_matrix, mcmc$meta$start_c[country],
                                                  mcmc$meta$lambda_c[country], mcmc$meta$dl.p1, mcmc$meta$dl.p2)
-                        if (log_cond_Triangle_c4_trans(Triangle_c4_trans_prop,eps_T_prop,
-                mcmc$sd_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1),country],
-                mcmc$mean_eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1),country],
-                                                        mcmc$Triangle4, mcmc$delta4)
+                  if (.C("log_cond_Triangle_c4_trans", Triangle_c4_trans_prop, eps_T_prop,
+                			mcmc$sd_Tc[epsT.idx,country],
+                			mcmc$mean_eps_Tc[epsT.idx,country], lepsT.idx, mcmc$Triangle4, mcmc$delta4,
+                			log_cond=log_cond)$log_cond 
                                  >= z) {
 
-                        mcmc$eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country] <- eps_T_prop
+                        mcmc$eps_Tc[epsT.idx, country] <- eps_T_prop
                         mcmc$Triangle_c4[country] <- Triangle_c4_prop
-                        return(mcmc)
+                        return()
                 } else {
                         # shrink interval
                         if (Triangle_c4_prop < mcmc$Triangle_c4[country]){
@@ -181,21 +186,20 @@ mcmc.update.gamma <- function(country, mcmc) {
                     mcmc$Triangle_c4[country], mcmc$d_c[country]) 
     eps_T_prop <- get_eps_T(theta_prop, country, mcmc$meta$tfr_matrix,mcmc$meta$start_c[country],
                             mcmc$meta$lambda_c[country],mcmc$meta$dl.p1, mcmc$meta$dl.p2)
+    idx <- mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1)
     prob_accept <- exp(log_like_gammas(gamma_prop,eps_T_prop,
-                                       mcmc$sd_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country], 
-                                       mcmc$mean_eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country], 
-                                       mcmc$alpha, mcmc$delta)- 
-                       log_like_gammas(mcmc$gamma_ci[country,],
-                                       mcmc$eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country],
-                                       mcmc$sd_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country], 
-                                       mcmc$mean_eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country], 
+                                       mcmc$sd_Tc[idx, country], mcmc$mean_eps_Tc[idx, country], 
+                                       mcmc$alpha, mcmc$delta) - 
+                       log_like_gammas(mcmc$gamma_ci[country,,drop=FALSE],
+                                       mcmc$eps_Tc[idx, country], mcmc$sd_Tc[idx, country], 
+                                       mcmc$mean_eps_Tc[idx, country], 
                                        mcmc$alpha, mcmc$delta) )
                                 
 	if (runif(1) < prob_accept){
 		mcmc$gamma_ci[country,] <- gamma_prop
-		mcmc$eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country] <- eps_T_prop
+		mcmc$eps_Tc[idx, country] <- eps_T_prop
     }
-    return(mcmc)
+    return()
 }
 
 
@@ -230,7 +234,7 @@ mcmc.update.d <- function(country, mcmc) {
                                 mcmc$psi, mcmc$chi) >= z) {
                         mcmc$eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country] <- eps_T_prop
                         mcmc$d_c[country] <- d_prop
-                        return(mcmc)
+                        return()
                 } else {
                         # shrink interval
                         if (d_prop < mcmc$d_c[country]){
@@ -270,7 +274,7 @@ mcmc.update.U <- function(country, mcmc) {
                                  >= z) {
                         mcmc$eps_Tc[mcmc$meta$start_c[country]:(mcmc$meta$lambda_c[country]-1), country] <- eps_T_prop
                         mcmc$U_c[country] <- U_prop
-                        return(mcmc)
+                        return()
                 } else {
                         # shrink interval
                         if (U_prop < mcmc$U_c[country]){

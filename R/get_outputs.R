@@ -25,7 +25,7 @@ get.tfr.mcmc <- function(sim.dir=file.path(getwd(), 'bayesTFR.output'), chain.id
 		if (verbose)
 			cat('Loading chain', imc.d, 'from disk. ')
 		load(file=file.path(sim.dir, mc.dirs.short[counter], 'bayesTFR.mcmc.rda'))
-		mc <- c(list(meta=bayesTFR.mcmc.meta), bayesTFR.mcmc)
+		mc <- c(bayesTFR.mcmc, list(meta=bayesTFR.mcmc.meta))
 		class(mc) <- class(bayesTFR.mcmc)
 		if (!low.memory) { # load full mcmc traces
 			th.burnin <- get.thinned.burnin(mc, burnin)
@@ -84,7 +84,7 @@ create.thinned.tfr.mcmc <- function(mcmc.set, thin=1, burnin=0, output.dir=NULL,
 	store.bayesTFR.meta.object(meta, meta$output.dir)
 
 	
-	thin.index <- if(thin > mcthin) unique(round(seq(thin, total.iter, by=thin/mcthin))) else 1:total.iter
+	thin.index <- if(thin > mcthin) unique(round(seq(1, total.iter, by=thin/mcthin))) else 1:total.iter
 	nr.points <- length(thin.index)
 	
 	#create one collapsed mcmc
@@ -169,6 +169,8 @@ has.tfr.prediction <- function(mcmc=NULL, sim.dir=NULL) {
 get.tfr.prediction <- function(mcmc=NULL, sim.dir=NULL, mcmc.dir=NULL) {
 	############
 	# Returns an object of class bayesTFR.prediction
+	# Set mcmc.dir to NA, if the prediction object should not have a pointer 
+	# to the corresponding mcmc traces.
 	############
 	if (!is.null(mcmc)) 
 		sim.dir <- if(is.character(mcmc)) mcmc else mcmc$meta$output.dir
@@ -185,11 +187,13 @@ get.tfr.prediction <- function(mcmc=NULL, sim.dir=NULL, mcmc.dir=NULL) {
 	pred <- bayesTFR.prediction
 	# re-route mcmcs if necessary
 	if(!is.null(mcmc.dir) || !has.tfr.mcmc(pred$mcmc.set$meta$output.dir)) {
-		new.path <- file.path(sim.dir, basename(pred$mcmc.set$meta$output.dir))
-		if (has.tfr.mcmc(new.path)) pred$mcmc.set <- get.tfr.mcmc(new.path)
-		else {
-			est.dir <- if(is.null(mcmc.dir)) sim.dir else mcmc.dir
-			pred$mcmc.set <- get.tfr.mcmc(est.dir)
+		if((!is.null(mcmc.dir) && !is.na(mcmc.dir)) || is.null(mcmc.dir)) {
+			new.path <- file.path(sim.dir, basename(pred$mcmc.set$meta$output.dir))
+			if (has.tfr.mcmc(new.path)) pred$mcmc.set <- get.tfr.mcmc(new.path)
+			else {
+				est.dir <- if(is.null(mcmc.dir)) sim.dir else mcmc.dir
+				pred$mcmc.set <- get.tfr.mcmc(est.dir)
+			}
 		}
 	}
 	return(pred)
@@ -595,7 +599,7 @@ coda.mcmc.bayesTFR.mcmc <- function(mcmc, country=NULL, par.names=tfr.parameter.
 }
 	
 	
-coda.mcmc.list <- function(mcmc=NULL, country=NULL, chain.ids=NULL,
+coda.list.mcmc <- function(mcmc=NULL, country=NULL, chain.ids=NULL,
 							sim.dir=file.path(getwd(), 'bayesTFR.output'), 
 							par.names=tfr.parameter.names(), 
 							par.names.cs=tfr.parameter.names.cs(), 
@@ -765,7 +769,7 @@ summary.bayesTFR.mcmc.set <- function(object, country=NULL, chain.id=NULL,
 		}
 		country <- country.obj$code
 	}
-	summary(coda.mcmc.list(object, country=country, par.names=par.names,
+	summary(coda.list.mcmc(object, country=country, par.names=par.names,
 							par.names.cs=par.names.cs, thin=thin, burnin=burnin), ...)
 }
 
@@ -791,10 +795,15 @@ get.prediction.summary.data <- function(object, unchanged.pars, country, compact
 	res <- list()
 	for (par in unchanged.pars)
 		res[[par]] <- object[[par]]
-	proj.years <- seq(object$end.year-5*object$nr.projections-2, object$end.year-2, by=5)
-	res$projection.years <- proj.years[2:(object$nr.projections+1)]
+	proj.and.present.years <- if(is.null(object$proj.years)) 
+				seq(object$end.year-5*object$nr.projections-2, 
+										object$end.year-2, by=5)
+							else object$proj.years
+
+	res$projection.years <- proj.and.present.years[2:length(proj.and.present.years)]
 	if(is.null(country)) return(res)
-	country <- get.country.object(country, object$mcmc.set$meta)
+	if (!is.list(country))
+		country <- get.country.object(country, object$mcmc.set$meta)
 	if(is.null(country$code)) stop('No prediction available for this country.')
 	res$country.name <- country$name
 	
@@ -807,7 +816,7 @@ get.prediction.summary.data <- function(object, unchanged.pars, country, compact
 	res$projections <- cbind(t(object$traj.mean.sd[country$index,,]), t(object$quantiles[country$index,quant.index,]))
 	colnames(res$projections) <- c('mean', 'SD', 
 			paste(as.numeric(dimnames(object$quantiles)[[2]][quant.index])*100, '%', sep=''))
-	rownames(res$projections) <- proj.years
+	rownames(res$projections) <- proj.and.present.years
 	return(res)
 }
 
@@ -948,6 +957,24 @@ burn.and.thin <- function(mcmc, burnin=0, thin=1) {
 
 no.traces.loaded <- function(mcmc) return((length(mcmc$traces) == 1) && mcmc$traces == 0)
 
+tfr.set.identical <- function(mcmc.set1, mcmc.set2) {
+	# Test if two bayesTFR sets are identical
+	same <- setequal(names(mcmc.set1), names(mcmc.set2)) && identical(mcmc.set1$meta, mcmc.set2$meta) && length(mcmc.set1$mcmc.list) == length(mcmc.set2$mcmc.list)
+	if(!same) return(same)
+	for(i in 1:length(mcmc.set1$mcmc.list)) {
+		same <- same && tfr.identical(mcmc.set1$mcmc.list[[i]], mcmc.set2$mcmc.list[[i]])
+	}
+	return(same)
+}
+
+tfr.identical <- function(mcmc1, mcmc2) {
+	# Test if two mcmcs are identical	
+	same <- setequal(names(mcmc1), names(mcmc2))
+	for(item in names(mcmc1)) 
+		same <- same && identical(mcmc1[[item]], mcmc2[[item]])
+	return(same)
+}
+
 get.tfr.trajectories <- function(tfr.pred, country) {
 	country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta)
 	return(get.trajectories(tfr.pred, country.obj$code)$trajectories)
@@ -968,3 +995,13 @@ get.data.matrix.bayesTFR.mcmc.meta <- function(meta, ...) return (meta$tfr_matri
 "get.countries.index" <- function(meta, ...) UseMethod("get.countries.index")
 
 get.countries.index.bayesTFR.mcmc.meta  <- function(meta, ...) return (meta$id_DL)
+
+"get.countries.table" <- function(object, ...) UseMethod("get.countries.table")
+get.countries.table.bayesTFR.mcmc.set <- function(object, ...) 
+	return(data.frame(code=object$meta$regions$country_code, name=object$meta$regions$country_name))
+get.countries.table.bayesTFR.prediction <- function(object, ...) {
+	n <- dim(get.data.imputed(object))[2]
+	return(data.frame(code=object$mcmc.set$meta$regions$country_code[1:n], 
+					name=object$mcmc.set$meta$regions$country_name[1:n]))
+}
+

@@ -23,8 +23,13 @@
 \alias{get.all.parameter.names.cs}
 \alias{get.all.parameter.names.extended} 
 \alias{get.ar1.parameters}
+\alias{get.ar1.countries}
+\alias{get.ar1.countries.index}
+\alias{get.ar1.data}
 \alias{get.burned.tfr.traces}
 \alias{get.countries.index}
+\alias{get.data.for.worldmap}
+\alias{get.data.for.worldmap.bayesTFR.prediction}
 \alias{get.data.imputed}
 \alias{get.data.matrix}
 \alias{get.friendly.variant.names}
@@ -110,9 +115,12 @@
 \alias{store.mcmc}
 \alias{store.traj.ascii}
 \alias{thinindep}
+\alias{tfr.get.dlcurves}
 \alias{tfr.info}
 \alias{tfr.mcmc.sampling}
 \alias{tfr.mcmc.sampling.extra}
+\alias{tfr.set.identical}
+\alias{tfr.identical}
 \alias{write.table.into.file.cdep}
 \alias{write.table.into.file.cindep}
 \alias{write.values.into.file.cdep}
