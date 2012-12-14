@@ -15,7 +15,7 @@ Runs (or continues running) MCMCs for simulating the total fertility rate of all
 run.tfr.mcmc(nr.chains = 3, iter = 62000, 
     output.dir = file.path(getwd(), "bayesTFR.output"), 
     thin = 1, replace.output = FALSE, 
-    start.year = 1950, present.year = 2010, wpp.year = 2010, 
+    start.year = 1750, present.year = 2010, wpp.year = 2010, 
     my.tfr.file = NULL, buffer.size = 100, 
     U.c.low = 5.5, U.up = 8.8, U.width = 3,
     mean.eps.tau0 = -0.25, sd.eps.tau0 = 0.4, nu.tau0 = 2, 
@@ -36,15 +36,15 @@ run.tfr.mcmc(nr.chains = 3, iter = 62000,
     Triangle_c4.ini = NULL, const.ini = NULL, gamma.ini = 1, 
     proposal_cov_gammas = NULL,
     seed = NULL, parallel = FALSE, nr.nodes = nr.chains, 
-    save.all.parameters = FALSE, 
+    save.all.parameters = FALSE, compression.type = 'None',
     auto.conf = list(max.loops=5, iter=62000, iter.incr=10000, 
         nr.chains=3, thin=80, burnin=2000),
-    verbose = FALSE, ...)
+    verbose = FALSE, verbose.iter = 10, ...)
 		
 continue.tfr.mcmc(iter, chain.ids=NULL, 
     output.dir=file.path(getwd(), "bayesTFR.output"), 
     parallel = FALSE, nr.nodes = NULL, auto.conf = NULL,
-    verbose=FALSE, ...)
+    verbose=FALSE, verbose.iter = 10, ...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -98,13 +98,15 @@ continue.tfr.mcmc(iter, chain.ids=NULL,
   \item{parallel}{Logical determining if the simulation should run multiple chains in parallel. If it is \code{TRUE}, the package \pkg{\link[snowFT]{snowFT}} is required.}
   \item{nr.nodes}{Relevant only if \code{parallel} is \code{TRUE}. It gives the number of nodes for running the simulation in parallel. By default it equals to the number of chains.}
   \item{save.all.parameters}{If \code{TRUE}, the distortion terms \eqn{\epsilon_{c,t}}{eps_ct} for all \eqn{t} are stored on disk, otherwise not.}
+  \item{compression.type}{One of \sQuote{None}, \sQuote{gz}, \sQuote{xz}, \sQuote{bz}, determining type of a compression of the MCMC files.}
   \item{auto.conf}{List containing a configuration for an \sQuote{automatic} run (see description of argument \code{iter}). Item \code{iter} gives the number of iterations in the first chunk of the MCMC simulation; item \code{iter.incr} gives the number of iterations in the following chunks; \code{nr.chains} gives the number of chains in all chunks of the MCMC simulation; items \code{thin} and \code{burnin} are used in the convergence diagnostics following each chunk; \code{max.loops} controls the maximum number of chunks. All items must be integer values. This argument is only used if the function argument \code{iter} is set to \sQuote{auto}.}
   \item{verbose}{Logical switching log messages on and off.}
+  \item{verbose.iter}{Integer determining how often (in number of iterations) log messages are outputted during the estimation.}
   \item{\dots}{Additional parameters to be passed to the function \code{\link[snowFT]{performParallel}}, if \code{parallel} is \code{TRUE}.}
   \item{chain.ids}{Array of chain identifiers that should be resumed. If it is \code{NULL}, all existing chains in \code{output.dir} are resumed.}
   }
 \details{
-	The function \code{run.tfr.mcmc} creates an object of class \code{\link{bayesTFR.mcmc.meta}} and stores it in \code{output.dir}.  It launches \code{nr.chains} MCMCs, either sequentially or in parallel.  Parameter traces of each chain are stored (as compressed ASCII files) in a subdirectory of \code{output.dir}, called \code{mc}\emph{x} where \emph{x} is the identifier of that chain.  There is one file per parameter, named after the parameter with the suffix \dQuote{.txt.gz}.  Country-specific parameters (\eqn{U, d, \gamma}{U, d, gamma}) have the suffix \code{_c}\emph{y} where \emph{y} is the country code.  In addition to the trace files, each \code{mc}\emph{x} directory contains the object \code{\link{bayesTFR.mcmc}} in binary format.  All chain-specific files  are written into disk after the first, last and each \code{buffer.size}-th iteration.
+	The function \code{run.tfr.mcmc} creates an object of class \code{\link{bayesTFR.mcmc.meta}} and stores it in \code{output.dir}.  It launches \code{nr.chains} MCMCs, either sequentially or in parallel.  Parameter traces of each chain are stored as (possibly compressed) ASCII files in a subdirectory of \code{output.dir}, called \code{mc}\emph{x} where \emph{x} is the identifier of that chain.  There is one file per parameter, named after the parameter with the suffix \dQuote{.txt}, possibly followed by a compression suffix if \code{compression.type} is given.  Country-specific parameters (\eqn{U, d, \gamma}{U, d, gamma}) have the suffix \code{_c}\emph{y} where \emph{y} is the country code.  In addition to the trace files, each \code{mc}\emph{x} directory contains the object \code{\link{bayesTFR.mcmc}} in binary format.  All chain-specific files  are written into disk after the first, last and each \code{buffer.size}-th iteration.
 	
 Using the function \code{continue.tfr.mcmc} one can continue simulating an existing MCMCs by \code{iter} iterations for either all or selected chains.
 

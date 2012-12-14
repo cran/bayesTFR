@@ -16,11 +16,11 @@ tfr.trajectories.plot(tfr.pred, country, pi = c(80, 95),
     xlim = NULL, ylim = NULL, type = 'b', xlab = 'Year', ylab = 'TFR', 
     main = NULL, lwd = c(2, 2, 2, 2, 2, 1), 
     col=c('black', 'green', 'red', 'red', 'blue', 'gray'),
-    show.legend = TRUE, \dots)
+    show.legend = TRUE, add = FALSE, \dots)
 	
 tfr.trajectories.plot.all(tfr.pred, 
     output.dir = file.path(getwd(), 'TFRtrajectories'),
-    output.type = "png", verbose = FALSE, \dots)
+    output.type = "png", main = NULL, verbose = FALSE, \dots)
 	
 tfr.trajectories.table(tfr.pred, country, pi = c(80, 95), 
     half.child.variant = TRUE)
@@ -34,12 +34,14 @@ tfr.trajectories.table(tfr.pred, country, pi = c(80, 95),
   \item{nr.traj}{Number of trajectories to be plotted. If \code{NULL}, all trajectories are plotted, otherwise they are thinned evenly.}
   \item{adjusted.only}{Logical. By default, if the projection median is adjusted using e.g. \code{\link{tfr.median.set}}, the function plots the adjusted median. If \code{adjusted.only=FALSE} the original (non-adjusted) median is plotted as well.}
   \item{typical.trajectory}{Logical. If \code{TRUE} one trajectory is shown that has the smallest distance to the median.}
-  \item{xlim, ylim, type, xlab, ylab, main}{Graphical parameters passed to the \code{plot} function.}
+  \item{xlim, ylim, type, xlab, ylab}{Graphical parameters passed to the \code{plot} function.}
     \item{lwd, col}{Vector of six elements giving the line width and color for: 1. observed data, 2. imputed missing data, 3. median, 4. quantiles, 5. half-child variant, 6. trajectories.}
   \item{show.legend}{Logical controlling whether the legend should be drawn.}
+  \item{add}{Logical controlling whether the trajectories should be plotted into a new graphic device (\code{FALSE}) or into an existing device (\code{TRUE}). One can use this argument to plot trajectories from multiple countries into one graphics.}
   \item{\dots}{Additional graphical parameters. In addition, for \code{tfr.trajectories.plot.all}, \code{\dots} contains any of the arguments of \code{tfr.trajectories.plot}.}
   \item{output.dir}{Directory into which resulting graphs are stored.}
   \item{output.type}{Type of the resulting files. It can be \dQuote{png}, \dQuote{pdf}, \dQuote{jpeg}, \dQuote{bmp}, \dQuote{tiff}, or \dQuote{postscript}.}
+  \item{main}{Main title for the plot(s). In \code{tfr.trajectories.plot.all} any occurence of the string \dQuote{XXX} is replaced by the country name.}
   \item{verbose}{Logical switching log messages on and off.}
 }
 \details{

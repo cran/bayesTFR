@@ -1,3 +1,37 @@
+2.1-0 (12/14/2012)
+-----
+Added support of xz, gz, and bz compression for MCMC storage.
+
+Example data reduced to one chain.
+
+2.0-1 (12/03/2012)
+-----
+Disabled a few examples and tests for run-time reasons.
+
+2.0-0 (11/30/2012)
+-----
+Added supplemental historical time series for some countries going back to 1750. 
+
+Added functionality of using historical data prior to 1950 for a subset of countries.
+
+Default of the argument start.year in run.tfr.mcmc changed to 1750.
+
+Methodology of finding start of the fertility transition changed.
+
+1.6-0 (10/11/2012)
+-----
+Function tfr.GoF.dl renamed to tfr.dl.coverage. Its MSE output changed to RMSE. Added MAE and cumm.CDF.
+
+Missing values can be used at the beginning of historical TFR time series. 
+
+Argument 'projection.year' in all map functions changed to 'year'.
+
+A wildcard 'XXX' can be passed in the 'main' argument of all the *.all plotting functions. It is replaced by the corresponding country name.
+
+Argument 'verbose.iter' added to run.tfr.mcmc.
+
+Argument 'data.args' added to tfr.map.
+
 1.5-1 (03/29/2012)
 -----
 Example data reduced from three chains of 50 iterations each to two chains of 30 iterations each in order to make the package smaller.
