@@ -184,23 +184,29 @@ tfr.raftery.diag <- function(mcmc=NULL,
 		}
 		return(FALSE)
 	}
-	
 	if(verbose) cat('\nComputing Raftery Diagnostics ... this can take a while ...\n')
 	if (is.null(mcmc)) {
 		mcmc.set <- get.tfr.mcmc(sim.dir=sim.dir, low.memory=TRUE)
 	} else {
 		mcmc.set <- mcmc
 	}
+	gui.option.name <- paste('bDem', strsplit(class(mcmc.set), '.', fixed=TRUE)[[1]][1], 'diagnose', sep='.')
+	gui.option.name.status <- paste(gui.option.name, 'status', sep='.')
+	gui.options <- list()
 	result.025 <- result.975 <- burnin.025 <- burnin.975 <- rd.025<- thin.ind.025 <- thin.ind.975 <- NULL
 	if (!is.null(par.names)) {
 		coda.mc <- coda.list.mcmc(mcmc.set, country=country, rm.const.pars=TRUE, low.memory=TRUE,
 						par.names=par.names, par.names.cs=NULL, burnin=burnin, ...
 						)
+		gui.options[[gui.option.name.status]] <- 'processing country-independent pars (q=0.025)'
+		unblock.gtk(gui.option.name, gui.options)
 		if(verbose) cat('\t\tProcessing raftery.diag(..., r=0.0125, q=0.025) for country-independent parameters\n')
 		rd.025 <- raftery.diag(coda.mc, r=0.0125, q=0.025)
 		if(is.error(rd.025)) return()
 		thin.ind.025 <- diag.thin.indep(coda.mc, q=0.025)
 		colnames(thin.ind.025) <- rownames(rd.025[[1]]$resmatrix)
+		gui.options[[gui.option.name.status]] <- 'processing country-independent pars (q=0.975)'
+		unblock.gtk(gui.option.name, gui.options)
 		if(verbose) cat('\t\tProcessing raftery.diag(..., r=0.0125, q=0.975) for country-independent parameters\n')
 		rd.975 <- raftery.diag(coda.mc, r=0.0125, q=0.975)
 		if(is.error(rd.975)) return()
@@ -228,7 +234,17 @@ tfr.raftery.diag <- function(mcmc=NULL,
 		}
 		if(verbose) 
 			cat('\t\tProcessing raftery.diag for country ')
+		country.counter <- 0
+		status.for.gui <- paste('out of', length(c.index), 'countries.')
 		for(country.idx in c.index) {
+			if(getOption(gui.option.name, default=FALSE)) {
+				# This is to unblock the GUI, if the run is invoked from bayesDem
+				# and pass info about its status
+				# In such a case the gtk libraries are already loaded
+				country.counter <- country.counter + 1
+				gui.options[[gui.option.name.status]] <- paste('finished', country.counter, status.for.gui)
+				unblock.gtk(gui.option.name, gui.options)
+			}
 			country.obj <- get.country.object(country.idx, mcmc.set$meta, index=TRUE)
 			coda.mc.cs <- coda.list.mcmc(mcmc.set, country=country.obj$code, 
 									rm.const.pars=TRUE, low.memory=TRUE,
@@ -538,7 +554,7 @@ thinindep <- function(x,q){
 return(k)
 }
 
-tfr.GoF.dl <- function(sim.dir, pi=c(80,90,95), burnin=2000, verbose=TRUE) {
+tfr.dl.coverage <- function(sim.dir, pi=c(80,90,95), burnin=2000, verbose=TRUE) {
 	if(has.tfr.prediction(sim.dir=sim.dir)) {
 		pred <- get.tfr.prediction(sim.dir=sim.dir)
 		mcmc.set <- pred$mcmc.set
@@ -561,10 +577,11 @@ tfr.DLisDecrement <- function() {
 	total.GoF <- rep(0, length(pi))
 	time.GoF <- matrix(0, nrow=length(pi), ncol=T.total-1)
 	country.GoF <- matrix(0, nrow=length(pi), ncol=max(countries.index))
-	total.mse <- 0
-	time.mse <- rep(0, T.total-1)
-	country.mse <- rep(0, max(countries.index))
+	total.mse <- total.mae <- 0
+	time.mse <- time.mae <- rep(0, T.total-1)
+	country.mse <- country.mae <- rep(0, max(countries.index))
 	counter <- matrix(0, ncol=max(countries.index), nrow=T.total-1)
+	pred.cdf <- matrix(NA, ncol=max(countries.index), nrow=T.total-1)
 	if(verbose) cat('\nAssessing goodness of fit for country ')
 	for(icountry in countries.index) {
 		if(verbose) cat(icountry, ', ')
@@ -587,36 +604,53 @@ tfr.DLisDecrement <- function() {
         		time.GoF[i,valid.time[itime]] <- time.GoF[i,valid.time[itime]] + (observed[itime] >= dlpi[1,itime] & observed[itime] <= dlpi[2,itime])
         	}
         }
+        for(itime in 1:length(valid.time)) {
+        	rankdistr <- rank(c(dlc[,itime], observed[itime]))
+        	pred.cdf[valid.time[itime], icountry] <- rankdistr[nrow(dlc)+1]/(nrow(dlc)+1)
+		}
         dlmean <- apply(dlc, 2, mean)
+        dlmedian <- apply(dlc, 2, median)
         country.mse[icountry] <- sum((observed-dlmean)^2)
+        country.mae[icountry] <- sum(abs(observed-dlmedian))
         total.mse <- total.mse + country.mse[icountry]
-        for(itime in 1:length(valid.time))
+        total.mae <- total.mae + country.mae[icountry]
+        for(itime in 1:length(valid.time)) {
         	time.mse[valid.time[itime]] <- time.mse[valid.time[itime]] + (observed[itime] - dlmean[itime])^2
-        
+        	time.mae[valid.time[itime]] <- time.mae[valid.time[itime]] + abs(observed[itime] - dlmedian[itime])
+        }
 	}
 	if(verbose) cat('\n')	
 	total.GoF <- total.GoF/sum(counter)
 	total.mse <- total.mse/sum(counter)
+	total.mae <- total.mae/sum(counter)
 	pi.names <- paste(pi, '%', sep='')
 	names(total.GoF) <- pi.names
-	names(total.mse) <- 'MSE'
+	names(total.mse) <- 'RMSE'
+	names(total.mae) <- 'MAE'
 	rowsum.counter <- rowSums(counter)
 	for(row in 1:nrow(time.GoF)) {
 		time.GoF[row,] <- time.GoF[row,]/rowsum.counter
 	}
 	time.mse <- time.mse/rowsum.counter
+	time.mae <- time.mae/rowsum.counter
 	dimnames(time.GoF) <- list(pi.names, rownames(data)[2:T.total])
 	names(time.mse) <- rownames(data)[2:T.total]
+	names(time.mae) <- rownames(data)[2:T.total]
 	colsum.counter <- colSums(counter)
 	for(row in 1:nrow(country.GoF)) {
 		country.GoF[row,] <- country.GoF[row,]/colsum.counter
 	}
 	country.mse <- country.mse/colsum.counter
+	country.mae <- country.mae/colsum.counter
 	dimnames(country.GoF) <- list(pi.names, meta$regions$country_code[1:max(countries.index)])
 	names(country.mse) <- meta$regions$country_code[1:max(countries.index)]
+	names(country.mae) <- meta$regions$country_code[1:max(countries.index)]
 	country.GoF[is.nan(country.GoF)] <- NA
 	country.mse[is.nan(country.mse)] <- NA
+	country.mae[is.nan(country.mae)] <- NA
 	if(verbose) cat('Done.\n')
-	return(list(total.gof=total.GoF, time.gof=time.GoF, country.gof=country.GoF,
-				total.mse=total.mse, time.mse=time.mse, country.mse=country.mse))
+	return(list(total.coverage=total.GoF, time.coverage=time.GoF, country.coverage=country.GoF,
+				total.rmse=sqrt(total.mse), time.rmse=sqrt(time.mse), country.rmse=sqrt(country.mse), 
+				total.mae=total.mae, time.mae=time.mae, country.mae=country.mae,
+				pred.cdf=pred.cdf, n=counter))
 }

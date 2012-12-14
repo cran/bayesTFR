@@ -6,11 +6,29 @@ test.load.UNtfr <- function(wpp.year=2008) {
 	test.name <- 'loading UN TFR file'
 	start.test(test.name)
 	tfr <- bayesTFR:::read.UNtfr(wpp.year)
-	stopifnot(length(dim(tfr$data))==2)
-	stopifnot(dim(tfr$data)[1] > 150)
-	stopifnot(is.element('last.observed', colnames(tfr$data)))
-	stopifnot(length(tfr$replaced) == 0)
-	stopifnot(length(tfr$added) == 0)
+	stopifnot(length(dim(tfr$data.object$data))==2)
+	stopifnot(dim(tfr$data.object$data)[1] > 150)
+	stopifnot(is.element('last.observed', colnames(tfr$data.object$data)))
+	stopifnot(length(tfr$data.object$replaced) == 0)
+	stopifnot(length(tfr$data.object$added) == 0)
+	test.ok(test.name)
+}
+
+test.load.UNtfr.and.my.tfr.file <- function() {
+	# read the UN TFR input file
+	test.name <- 'loading UN TFR file and my_tfr_file'
+	start.test(test.name)
+	my.tfr.file <- file.path(.find.package("bayesTFR"), 'data', 'my_tfr_template.txt')
+	tfr <- bayesTFR:::read.UNtfr(2010, my.tfr.file=my.tfr.file)
+	stopifnot(length(dim(tfr$data.object$data))==2)
+	stopifnot(length(dim(tfr$suppl.data.object$data))==2)
+	stopifnot(dim(tfr$data.object$data)[1] == 232)
+	stopifnot(dim(tfr$suppl.data.object$data)[1] == 104)
+	stopifnot(is.element('last.observed', colnames(tfr$data.object$data)))
+	stopifnot(length(tfr$data.object$replaced) == 1)
+	stopifnot(length(tfr$data.object$added) == 0)
+	stopifnot(length(tfr$suppl.data.object$replaced) == 0)
+	stopifnot(length(tfr$suppl.data.object$added) == 1)
 	test.ok(test.name)
 }
 
@@ -18,7 +36,7 @@ test.load.UNlocations <- function(wpp.year=2008) {
 	test.name <- 'loading WPP location file'
 	start.test(test.name)
 	tfr <- bayesTFR:::read.UNtfr(wpp.year)
-	locs <- bayesTFR:::read.UNlocations(tfr$data, wpp.year)
+	locs <- bayesTFR:::read.UNlocations(tfr$data.object$data, wpp.year)
 	stopifnot(length(dim(locs$loc_data)) == 2)
 	stopifnot(all(is.element(c('country_code', 'include_code'), colnames(locs$loc_data))))
 	stopifnot(dim(locs$loc_data)[1] > 200)
@@ -30,8 +48,8 @@ test.create.tfr.matrix <- function(wpp.year=2008) {
 	test.name <- 'creating TFR matrix'
 	start.test(test.name)
 	tfr <- bayesTFR:::read.UNtfr(wpp.year)
-	locs <- bayesTFR:::read.UNlocations(tfr$data, wpp.year)
-	tfr.and.regions <- bayesTFR:::get.TFRmatrix.and.regions(tfr$data, locs$loc_data, 
+	locs <- bayesTFR:::read.UNlocations(tfr$data.object$data, wpp.year)
+	tfr.and.regions <- bayesTFR:::get.TFRmatrix.and.regions(tfr$data.object$data, locs$loc_data, 
 												present.year=2009)
 	tfr.matrix <- tfr.and.regions$tfr_matrix
 	stopifnot(dim(tfr.matrix)[1] == 12)
@@ -39,13 +57,13 @@ test.create.tfr.matrix <- function(wpp.year=2008) {
 	test.ok(test.name)
 }
 
-test.run.mcmc.simulation <- function() {
+test.run.mcmc.simulation <- function(compression='None') {
 	sim.dir <- tempfile()
 
 	# run MCMC
 	test.name <- 'running MCMC'
 	start.test(test.name)
-	m <- run.tfr.mcmc(iter=5, nr.chains=1, output.dir=sim.dir)
+	m <- run.tfr.mcmc(iter=5, nr.chains=1, output.dir=sim.dir, start.year=1950, compression.type=compression)
 	stopifnot(m$mcmc.list[[1]]$finished.iter == 5)
 	stopifnot(get.total.iterations(m$mcmc.list, 0) == 5)
 	stopifnot(bayesTFR:::tfr.set.identical(m, get.tfr.mcmc(sim.dir)))
@@ -132,12 +150,12 @@ test.run.mcmc.simulation <- function() {
 	unlink(sim.dir, recursive=TRUE)
 }
 
-test.thinned.simulation <- function() {
+test.thinned.simulation <- function(compression='None') {
 	sim.dir <- tempfile()
 	# run MCMC
 	test.name <- 'running thinned MCMC'
 	start.test(test.name)
-	m <- run.tfr.mcmc(iter=10, nr.chains=2, output.dir=sim.dir, thin=2)
+	m <- run.tfr.mcmc(iter=10, nr.chains=2, output.dir=sim.dir, thin=2, compression.type=compression)
 	stopifnot(m$mcmc.list[[1]]$finished.iter == 10)
 	stopifnot(m$mcmc.list[[1]]$length == 6)
 	stopifnot(get.total.iterations(m$mcmc.list, 0) == 20)
@@ -293,9 +311,9 @@ test.existing.simulation <- function() {
 	test.name <- 'retrieving MCMC results'
 	start.test(test.name)
 	sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')
-	m <- get.tfr.mcmc(sim.dir, low.memory=FALSE, burnin=25, chain.ids=c(2))
+	m <- get.tfr.mcmc(sim.dir, low.memory=FALSE, burnin=25, chain.ids=1)
 	stopifnot(length(m$mcmc.list)==1)
-	stopifnot(dim(m$mcmc.list[[1]]$traces)[1]==5)
+	stopifnot(dim(m$mcmc.list[[1]]$traces)[1]==35)
 	test.ok(test.name)
 }
 
@@ -335,6 +353,24 @@ test.TFRtrajectories <- function() {
 	test.ok(test.name)
 }
 
+test.plot.all <- function() {
+	test.name <- 'plotting TFR trajectories and DL curves for all countries'
+	start.test(test.name)
+	sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')
+	pred <- get.tfr.prediction(sim.dir=sim.dir)
+	mc <- get.tfr.mcmc(sim.dir)
+	dir <- tempdir()
+	tfr.trajectories.plot.all(pred, output.dir=dir, main='XXX trajs')
+	trajf <- length(list.files(dir, pattern='png$', full.names=FALSE))
+	DLcurve.plot.all(mc, output.dir=dir, main='DL XXX', output.type='jpeg')
+	dlf <- length(list.files(dir, pattern='jpeg$', full.names=FALSE))
+	unlink(dir, recursive=TRUE)
+	stopifnot(trajf == get.nr.countries(mc$meta))
+	stopifnot(dlf == length(mc$meta$id_DL))
+	test.ok(test.name)
+}
+
+
 test.plot.density <- function() {
 	test.name <- 'plotting parameter density'
 	start.test(test.name)
@@ -356,7 +392,7 @@ test.plot.map <- function() {
 	sim.dir <- file.path(.find.package("bayesTFR"), "ex-data", 'bayesTFR.output')
 	pred <- get.tfr.prediction(sim.dir=sim.dir)
 	filename <- tempfile()
-	tfr.map(pred, projection.year=2043, device='png', device.args=list(filename=filename))
+	tfr.map(pred, year=2043, device='png', device.args=list(filename=filename))
 	dev.off()
 	size <- file.info(filename)['size']
 	unlink(filename)
@@ -365,7 +401,7 @@ test.plot.map <- function() {
 	
 	test.name <- 'creating parameter maps'
 	filename <- tempfile()
-	tfr.map(pred, projection.year=1985, device='png', par.name='gamma_2', device.args=list(filename=filename))
+	tfr.map(pred, year=1985, device='png', par.name='gamma_2', device.args=list(filename=filename))
 	dev.off()
 	size <- file.info(filename)['size']
 	unlink(filename)
@@ -393,12 +429,15 @@ test.get.parameter.traces <- function() {
 	stopifnot(nrow(traces)==3)
 	m.check <- get.tfr.mcmc(sim.dir, low.memory=FALSE, burnin=15)
 	stopifnot(traces[1,'chi']==m.check$mcmc.list[[1]]$traces[4,'chi'])
-	stopifnot(all(traces[c(2,3),'chi']==m.check$mcmc.list[[2]]$traces[c(10,14),'chi']))
+	#stopifnot(all(traces[c(2,3),'chi']==m.check$mcmc.list[[2]]$traces[c(10,14),'chi'])) # in case of two chains
+	stopifnot(all(traces[c(2,3),'chi']==m.check$mcmc.list[[1]]$traces[c(25,29),'chi']))
 	
-	traces <- get.tfr.parameter.traces(m$mcmc.list, burnin=15, thin=8)
+	m.check <- get.tfr.mcmc(sim.dir, low.memory=FALSE, burnin=30)
+	traces <- get.tfr.parameter.traces(m$mcmc.list, burnin=30, thin=8)
 	stopifnot(nrow(traces)==4)
 	stopifnot(traces[2,'psi']==m.check$mcmc.list[[1]]$traces[9,'psi'])
-	stopifnot(traces[4,'psi']==m.check$mcmc.list[[2]]$traces[10,'psi'])
+	#stopifnot(traces[4,'psi']==m.check$mcmc.list[[2]]$traces[10,'psi'])
+	stopifnot(traces[4,'psi']==m.check$mcmc.list[[1]]$traces[25,'psi'])
 	test.ok(test.name)
 }
 
@@ -439,5 +478,46 @@ test.median.adjust <- function() {
 	test.ok(test.name)
 
 	unlink(pred.dir)
+}
+
+test.estimate.mcmc.with.suppl.data <- function() {
+	sim.dir <- tempfile()
+   	# run MCMC
+    test.name <- 'estimating MCMC using supplemental data'
+    start.test(test.name)
+    m <- run.tfr.mcmc(nr.chains=1, iter=30, thin=1, output.dir=sim.dir, start.year=1750, seed=1)
+    stopifnot(length(m$meta$suppl.data$regions$country_code) == 103)
+	stopifnot(all(dim(m$meta$suppl.data$tfr_matrix) == c(40, 103)))
+    test.ok(test.name)
+        
+	# continue MCMC
+	test.name <- 'continuing MCMC with supplemental data'
+	start.test(test.name)
+	m <- continue.tfr.mcmc(iter=10, output.dir=sim.dir)
+	stopifnot(m$mcmc.list[[1]]$finished.iter == 40)
+	stopifnot(get.total.iterations(m$mcmc.list, 0) == 40)
+	stopifnot(!is.element(900, m$meta$regions$country_code)) # 'World' should not be included
+	test.ok(test.name)
+        
+	# run MCMC for an aggregation
+	test.name <- 'estimating MCMC for extra areas with supplemental data'
+	start.test(test.name)
+	data.dir <- file.path(.find.package("bayesTFR"), 'data')
+	m <- run.tfr.mcmc.extra(sim.dir=sim.dir, 
+                            my.tfr.file=file.path(data.dir, 'my_tfr_template.txt'), burnin=0, verbose=TRUE)
+	stopifnot(is.element(900, m$meta$regions$country_code)) # 'World' should be included
+	stopifnot(is.element(900, m$meta$suppl.data$regions$country_code))
+	test.ok(test.name)
+        
+	# run prediction
+	test.name <- 'running projections for simulation with supplemental data'
+	start.test(test.name)
+	pred <- tfr.predict(m, burnin=10, verbose=FALSE, save.as.ascii=0, rho=NULL, sigmaAR1=NULL)
+	spred <- summary(pred)
+	stopifnot(spred$nr.traj == 30)
+	stopifnot(!is.element(903, pred$mcmc.set$regions$country_code))
+	npred <- dim(pred$tfr_matrix_reconstructed)[2]
+	test.ok(test.name)
+	unlink(sim.dir, recursive=TRUE)
 }
 	

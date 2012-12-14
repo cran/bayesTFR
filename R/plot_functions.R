@@ -6,22 +6,8 @@ DLcurve.plot.all <- function (mcmc.list = NULL, sim.dir = NULL,
 	if(is.null(mcmc.list)) mcmc.list <- get.tfr.mcmc(sim.dir=sim.dir, verbose=verbose, burnin=burnin)
 	mcmc.list <- get.mcmc.list(mcmc.list)
 	meta <- mcmc.list[[1]]$meta
-	dl.countries <- meta$id_DL
-	postfix <- output.type
-	if(output.type=='postscript') postfix <- 'ps'
-
-    for (country in dl.countries) {
-        country.obj <- get.country.object(country, meta, index=TRUE)
-        if (verbose) 
-            cat("Creating DL graph for", country.obj$name, '(', country.obj$code, ')\n')
-        do.call(output.type, list(file.path(output.dir, 
-										paste('DLplot_c', country.obj$code, '.', postfix, sep=''))))
-        DLcurve.plot(mcmc.list = mcmc.list, country = country.obj$code, 
-            burnin = burnin, ...)
-        dev.off()
-    }
-    if (verbose) 
-        cat("\nDL plots stored into", output.dir, "\n")
+	.do.plot.all.country.loop(as.character(country.names(meta))[meta$id_DL], meta, output.dir, DLcurve.plot, output.type=output.type, 
+		file.prefix='DLplot', plot.type='DL graph', verbose=verbose, mcmc.list = mcmc.list, burnin = burnin, ...)
 }
 
 stop.if.country.not.DL <- function(country.obj, meta) {
@@ -91,7 +77,9 @@ DLcurve.plot <- function (mcmc.list, country, burnin = NULL, pi = 80, tfr.max = 
     						predictive.distr=predictive.distr)
     miny <- min(dlc)
     maxy <- max(dlc)
-    decr <- -diff(meta$tfr_matrix[1:meta$T_end, country$index])
+    obs.data <- get.observed.tfr(country$index, meta)[1:meta$T_end_c[country$index]]
+    decr <- -diff(obs.data)
+    maxy <- max(maxy, decr, na.rm=TRUE)
     thincurves <- get.thinning.index(nr.curves, dim(dlc)[1])
     ltype <- "l"
     if (thincurves$nr.points == 0) {
@@ -121,34 +109,26 @@ DLcurve.plot <- function (mcmc.list, country, burnin = NULL, pi = 80, tfr.max = 
         lines(dlpi[2, ] ~ tfr_plot, col = "red", lty = lty[i], 
             lwd = 2)
     }
-    points(decr ~ meta$tfr_matrix[1:(meta$T_end - 
-        1), country$index], pch = 19)
+    points(decr ~ obs.data[-length(obs.data)], pch = 19)
     legend("topright", legend = c("median", paste("PI", pi)), 
         lty = c(1, lty), bty = "n", col = "red")
 }
 
-
-tfr.trajectories.table <- function(tfr.pred, country, pi=c(80, 95), half.child.variant=TRUE) {
-	if (missing(country)) {
-		stop('Argument "country" must be given.')
-	}
-	country <- get.country.object(country, tfr.pred$mcmc.set$meta)
+.get.trajectories.table <- function(tfr.pred, country, obs.data, pi, pred.median, cqp, half.child.variant=FALSE) {
 	l <- tfr.pred$nr.projections
-	data.matrix <- get.data.imputed(tfr.pred)
-	x1 <- as.integer(rownames(data.matrix))
+	obs.data <- obs.data[!is.na(obs.data)]
+	x1 <- as.integer(names(obs.data))
 	x2 <- seq(max(x1)+5, by=5, length=l)
-	tfr <- as.matrix(data.matrix[,country$index], ncol=1)
+	tfr <- as.matrix(obs.data, ncol=1)
 	rownames(tfr) <- x1
 	pred.table <- matrix(NA, ncol=2*length(pi)+1, nrow=l)
-	pred.table[,1] <- get.median.from.prediction(tfr.pred, country$index, country$code)[2:(l+1)]
+	pred.table[,1] <- pred.median[2:(l+1)]
 	colnames(pred.table) <- c('median', rep(NA,ncol(pred.table)-1))
-	trajectories <- get.trajectories(tfr.pred, country$code)
 	idx <- 2
 	for (i in 1:length(pi)) {
-		cqp <- get.traj.quantiles(tfr.pred, country$index, country$code, trajectories$trajectories, pi[i])
 		al <- (1-pi[i]/100)/2
-		if (!is.null(cqp)) {
-			pred.table[,idx:(idx+1)] <- t(cqp[,2:(l+1)])
+		if (!is.null(cqp[[i]])) {
+			pred.table[,idx:(idx+1)] <- t(cqp[[i]][,2:(l+1)])
 		} else{
 			pred.table[,idx:(idx+1)] <- matrix(NA, nrow=l, ncol=2)
 		}
@@ -161,10 +141,24 @@ tfr.trajectories.table <- function(tfr.pred, country, pi=c(80, 95), half.child.v
 	colnames(pred.table)[2:ncol(pred.table)] <- cn[order(cn)]
 	if(half.child.variant) {
 		up.low <- get.half.child.variant(median=c(0, pred.table[,1]))
-		pred.table <- cbind(pred.table, t(up.low[2:1,2:ncol(up.low)]))
+		pred.table <- cbind(pred.table, t(up.low[,2:ncol(up.low)]))
 		colnames(pred.table)[(ncol(pred.table)-1):ncol(pred.table)] <- c('-0.5child', '+0.5child')
 	}
 	return(rbind(cbind(tfr, matrix(NA, nrow=nrow(tfr), ncol=ncol(pred.table)-1)), pred.table))
+}
+
+tfr.trajectories.table <- function(tfr.pred, country, pi=c(80, 95), half.child.variant=TRUE) {
+	if (missing(country)) {
+		stop('Argument "country" must be given.')
+	}
+	country <- get.country.object(country, tfr.pred$mcmc.set$meta)
+	obs.data <- get.data.imputed.for.country(tfr.pred, country$index)
+	pred.median <- get.median.from.prediction(tfr.pred, country$index, country$code)
+	trajectories <- get.trajectories(tfr.pred, country$code)
+	cqp <- list()
+	for (i in 1:length(pi))
+		cqp[[i]] <- get.traj.quantiles(tfr.pred, country$index, country$code, trajectories$trajectories, pi[i])
+	return(.get.trajectories.table(tfr.pred, country, obs.data, pi, pred.median, cqp, half.child.variant))
 }
 
 get.typical.trajectory.index <- function(trajectories) {
@@ -241,25 +235,40 @@ get.traj.quantiles <- function(tfr.pred, country.index, country.code, trajectori
 	
 tfr.trajectories.plot.all <- function(tfr.pred, 
 									output.dir=file.path(getwd(), 'TFRtrajectories'),
-									output.type="png", verbose=FALSE, ...) {
+									output.type="png", main=NULL, verbose=FALSE, ...) {
 	# plots TFR trajectories for all countries
+	.do.plot.all(tfr.pred$mcmc.set$meta, output.dir, tfr.trajectories.plot, output.type=output.type, 
+						verbose=verbose, tfr.pred=tfr.pred, ...)
+}
+
+.do.plot.all.country.loop <- function(country.names, meta, output.dir, func, output.type="png", 
+						file.prefix='TFRplot', plot.type='TFR graph', country.table=NULL,
+						main=NULL, verbose=FALSE, ...) {					
 	if(!file.exists(output.dir)) dir.create(output.dir, recursive=TRUE)
-	all.countries <- country.names(tfr.pred$mcmc.set$meta)
 	postfix <- output.type
 	if(output.type=='postscript') postfix <- 'ps'
-	for (country in all.countries) {
-		country.obj <- get.country.object(country, tfr.pred$mcmc.set$meta)
+	main.arg <- main
+	for (country in country.names) {
+		country.obj <- if(!is.null(meta)) get.country.object(country, meta)
+						else get.country.object(country, country.table=country.table)
 		if(verbose)
-			cat('Creating TFR graph for', country, '(', country.obj$code, ')\n')
-
+			cat('Creating', plot.type, 'for', country, '(', country.obj$code, ')\n')
+		if(!is.null(main) && grepl('XXX', main, fixed=TRUE))
+			main.arg <- gsub('XXX', as.character(country.obj$name), main, fixed=TRUE)
 		do.call(output.type, list(file.path(output.dir, 
-										paste('TFRplot_c', country.obj$code, '.', postfix, sep=''))))
-		tfr.trajectories.plot(tfr.pred, country=country.obj$code, ...)
+										paste(file.prefix,'_c', country.obj$code, '.', postfix, sep=''))))
+		do.call(func, list(country=country.obj$code, main=main.arg, ...))
 		dev.off()
 	}
 	if(verbose)
-		cat('\nTrajectory plots stored into', output.dir, '\n')
+		cat('\nPlots stored into', output.dir, '\n')	
 }
+
+.do.plot.all <- function(meta, ...) {
+	# processes plotting function func for all countries
+	.do.plot.all.country.loop(country.names(meta), meta, ...)				
+}
+
 
 get.half.child.variant <- function(median, increment=c(0, 0.25, 0.4, 0.5)) {
 	l <- length(median)
@@ -278,7 +287,7 @@ tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95),
 								  xlim=NULL, ylim=NULL, type='b', 
 								  xlab='Year', ylab='TFR', main=NULL, lwd=c(2,2,2,2,2,1), 
 								  col=c('black', 'green', 'red', 'red', 'blue', 'gray'),
-								  show.legend=TRUE, ...
+								  show.legend=TRUE, add=FALSE, ...
 								  ) {
 	# lwd/col is a vector of 6 line widths/colors for: 
 	#	1. observed data, 2. imputed missing data, 3. median, 4. quantiles, 5. +- 0.5 child, 6. trajectories
@@ -295,27 +304,28 @@ tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95),
 		col[(lcol+1):6] <- c('black', 'green', 'red', 'red', 'blue', 'gray')[(lcol+1):6]
 	}
 	country <- get.country.object(country, tfr.pred$mcmc.set$meta)
-	tfr_observed <- tfr.pred$mcmc.set$meta$tfr_matrix_observed
+	tfr_observed <- get.observed.tfr(country$index, tfr.pred$mcmc.set$meta, 'tfr_matrix_observed', 'tfr_matrix_all')
 	T_end_c <- tfr.pred$mcmc.set$meta$T_end_c
 	tfr_matrix_reconstructed <- get.tfr.reconstructed(tfr.pred$tfr_matrix_reconstructed, tfr.pred$mcmc.set$meta)
-	x1 <- as.integer(rownames(tfr_matrix_reconstructed))
-	x2 <- as.numeric(dimnames(tfr.pred$quantiles)[[3]])
-	#x2 <- seq(max(x1), by=5, length=tfr.pred$nr.projections+1)
-	lpart1 <- T_end_c[country$index]
-	y1.part1 <- tfr_observed[1:T_end_c[country$index],country$index]
+	suppl.T <- length(tfr_observed) - tfr.pred$mcmc.set$meta$T_end
+	y1.part1 <- tfr_observed[1:T_end_c[country$index]]
+	y1.part1 <- y1.part1[!is.na(y1.part1)]
+	lpart1 <- length(y1.part1)
 	y1.part2 <- NULL
-	lpart2 <- tfr.pred$mcmc.set$meta$T_end - T_end_c[country$index]
+	lpart2 <- tfr.pred$mcmc.set$meta$T_end - T_end_c[country$index] + suppl.T
 	if (lpart2 > 0) 
-		y1.part2 <- tfr_matrix_reconstructed[(T_end_c[country$index]+1):nrow(tfr_matrix_reconstructed),country$index]
-
+		y1.part2 <- tfr_matrix_reconstructed[(T_end_c[country$index]+1-suppl.T):nrow(tfr_matrix_reconstructed),country$index]
+	x1 <- as.integer(c(names(y1.part1), names(y1.part2)))
+	x2 <- as.numeric(dimnames(tfr.pred$quantiles)[[3]])	
 	trajectories <- get.trajectories(tfr.pred, country$code, nr.traj, typical.trajectory=typical.trajectory)
-	if(is.null(xlim)) xlim <- c(min(x1,x2), max(x1,x2))
-	if(is.null(ylim)) ylim <- c(0, max(trajectories$trajectories, y1.part1, y1.part2, na.rm=TRUE))
-	if(is.null(main)) main <- country$name
 	# plot historical data: observed
-	plot(x1[1:lpart1], y1.part1, type=type, xlim=xlim, ylim=ylim, ylab=ylab, xlab=xlab, main=main, 
-					panel.first = grid(), lwd=lwd[1], col=col[1], ...
-					)
+	if (!add) {
+		if(is.null(xlim)) xlim <- c(min(x1,x2), max(x1,x2))
+		if(is.null(ylim)) ylim <- c(0, max(trajectories$trajectories, y1.part1, y1.part2, na.rm=TRUE))
+		if(is.null(main)) main <- country$name
+		plot(x1[1:lpart1], y1.part1, type=type, xlim=xlim, ylim=ylim, ylab=ylab, xlab=xlab, main=main, 
+					panel.first = grid(), lwd=lwd[1], col=col[1], ...)
+	} else points(x1[1:lpart1], y1.part1, type=type, lwd=lwd[1], col=col[1], ...)
 	if(lpart2 > 0) { # imputed values
 		lines(x1[(lpart1+1): length(x1)], y1.part2, pch=2, type='b', col=col[2], lwd=lwd[2])
 		lines(x1[lpart1:(lpart1+1)], c(y1.part1[lpart1], y1.part2[1]), col=col[2], lwd=lwd[2]) # connection between the two parts
@@ -365,24 +375,21 @@ tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95),
 		cols <- c(cols, col[5])
 		lwds <- c(lwds, lwd[5])
 	}
-
-	legend <- c(legend, 'observed TFR')
-	cols <- c(cols, col[1])
-	lty <- c(lty, 1)
-	pch <- c(rep(-1, length(legend)-1), 1)
-	lwds <- c(lwds, lwd[1])
-	if(lpart2 > 0) {
-		legend <- c(legend, 'imputed TFR')
-		cols <- c(cols, col[2])
+	if(show.legend) {
+		legend <- c(legend, 'observed TFR')
+		cols <- c(cols, col[1])
 		lty <- c(lty, 1)
-		pch <- c(pch, 2)
-		lwds <- c(lwds, lwd[2])
-	}
-	if(show.legend)
+		pch <- c(rep(-1, length(legend)-1), 1)
+		lwds <- c(lwds, lwd[1])
+		if(lpart2 > 0) {
+			legend <- c(legend, 'imputed TFR')
+			cols <- c(cols, col[2])
+			lty <- c(lty, 1)
+			pch <- c(pch, 2)
+			lwds <- c(lwds, lwd[2])
+		}
 		legend('bottomleft', legend=legend, lty=lty, bty='n', col=cols, pch=pch, lwd=lwds)
-	#abline(h=1, lty=3)
-	#abline(h=1.5, lty=3)
-	#abline(h=2.1, lty=3)
+	}
 }
 
 extract.plot.args <- function(...) {
@@ -651,7 +658,7 @@ bdem.map.all <- function(pred, output.dir, type='tfr', output.type='png', range=
 	for (year in all.years) {
 		output.args[[filename.arg]] <- file.path(output.dir, 
 										paste(file.prefix, year, '.', postfix, sep=''))
-		do.call(paste(type, '.map', sep=''), c(list(projection.year=year, device=output.type, 
+		do.call(paste(type, '.map', sep=''), c(list(year=year, device=output.type, 
 							device.args=output.args), map.pars))
 		dev.off()
 	}
@@ -676,7 +683,7 @@ par.names.for.worldmap.bayesTFR.prediction <- function(pred, ...) {
 
 "get.data.for.worldmap" <- function(pred, ...) UseMethod ("get.data.for.worldmap")
 
-get.data.for.worldmap.bayesTFR.prediction <- function(pred, quantile=0.5, projection.year=NULL, par.name=NULL, 
+get.data.for.worldmap.bayesTFR.prediction <- function(pred, quantile=0.5, year=NULL, par.name=NULL, 
 									adjusted=FALSE, projection.index=1, pi=NULL, ...) {
 	meta <- pred$mcmc.set$meta
 	quantiles <- quantile
@@ -721,12 +728,12 @@ get.data.for.worldmap.bayesTFR.prediction <- function(pred, quantile=0.5, projec
 		period <- paste('Parameter', par.name, 'for')
 	} else { # data are TFRs
 		projection <- TRUE
-		if(!is.null(projection.year)) {
-			ind.proj <- bayesTFR:::get.predORest.year.index(pred, projection.year)
+		if(!is.null(year)) {
+			ind.proj <- bayesTFR:::get.predORest.year.index(pred, year)
 			projection.index <- ind.proj['index']
 			projection <- ind.proj['is.projection']
 			if(is.null(projection.index)) 
-				if(is.null(projection.index)) stop('Projection year ', projection.year, ' not found.')
+				if(is.null(projection.index)) stop('Projection year ', year, ' not found.')
 		}
 		if(projection) {
 			if(!all(is.element(as.character(quantiles), dimnames(pred$quantiles)[[2]])))
@@ -757,18 +764,18 @@ get.data.for.worldmap.bayesTFR.prediction <- function(pred, quantile=0.5, projec
 	return(list(period=period, data=res, country.codes=codes, lower=low, upper=up))
 }
 
-tfr.map <- function(pred, quantile=0.5, projection.year=NULL, par.name=NULL, adjusted=FALSE, 
-					projection.index=1,  device='dev.new', main=NULL, device.args=NULL, ...
+tfr.map <- function(pred, quantile=0.5, year=NULL, par.name=NULL, adjusted=FALSE, 
+					projection.index=1,  device='dev.new', main=NULL, device.args=NULL, data.args=NULL, ...
 				) {
 	require(rworldmap)
-	data.period <- get.data.for.worldmap(pred, quantile, projection.year=projection.year, 
-									par.name=par.name, adjusted=adjusted, projection.index=projection.index)
+	data.period <- do.call(get.data.for.worldmap, c(list(pred, quantile, year=year, 
+									par.name=par.name, adjusted=adjusted, projection.index=projection.index), data.args))
 	data <- data.period$data
 	period <- data.period$period
 	tfr <- data.frame(cbind(un=data.period$country.codes, tfr=data))
 	mtfr <- joinCountryData2Map(tfr, joinCode='UN', nameJoinColumn='un')
 	if(is.null(main)) {
-		main <- paste(period, .map.main.default(pred), quantile)
+		main <- paste(period, .map.main.default(pred, data.period), quantile)
 	}
 	if (device != 'dev.cur')
 		do.call('mapDevice', c(list(device=device), device.args))
@@ -777,46 +784,49 @@ tfr.map <- function(pred, quantile=0.5, projection.year=NULL, par.name=NULL, adj
 	do.call(addMapLegend, c(mapParams, legendWidth=0.5, legendMar=2, legendLabels='all'))
 }
 
-tfr.map.gvis <- function(pred, projection.year=NULL, quantile=0.5, pi=80, par.name=NULL, 
-							  adjusted=FALSE)
-	bdem.map.gvis(pred, projection.year=projection.year, 
-						quantile=quantile, pi=pi, par.name=par.name, adjusted=adjusted)
+tfr.map.gvis <- function(pred, year=NULL, quantile=0.5, pi=80, par.name=NULL, 
+							  adjusted=FALSE, ...)
+	bdem.map.gvis(pred, year=year, 
+						quantile=quantile, pi=pi, par.name=par.name, adjusted=adjusted, ...)
 
 
 "bdem.map.gvis" <- function(pred, ...) UseMethod ("bdem.map.gvis")
 
-bdem.map.gvis.bayesTFR.prediction <- function(pred, projection.year=NULL, quantile=0.5, pi=80, 
+bdem.map.gvis.bayesTFR.prediction <- function(pred, year=NULL, quantile=0.5, pi=80, 
 										par.name=NULL, html.file=NULL, adjusted=FALSE, ...) {
-	.do.gvis.bdem.map('TFR', 'BHM for Total Fertility Rate<br>', pred, projection.year=projection.year, 
-						quantile=quantile, pi=pi, par.name=par.name, adjusted=adjusted)
+	.do.gvis.bdem.map('TFR', 'BHM for Total Fertility Rate<br>', pred, year=year, 
+						quantile=quantile, pi=pi, par.name=par.name, adjusted=adjusted, ...)
 }
 
-.do.gvis.bdem.map <- function(what, title, pred, projection.year=NULL, quantile=0.5, pi=80, 
-									par.name=NULL, adjusted=FALSE) {
+.do.gvis.bdem.map <- function(what, title, pred, year=NULL, quantile=0.5, pi=80, 
+									par.name=NULL, adjusted=FALSE, ...) {
 	require(googleVis)
-	data(iso3166)
-	meta <- pred$mcmc.set$meta
-	data.period <- get.data.for.worldmap(pred, quantile, projection.year=projection.year, 
-									par.name=par.name, projection.index=1, adjusted=adjusted, pi=pi)
+	data.period <- get.data.for.worldmap(pred, quantile, year=year, 
+									par.name=par.name, projection.index=1, adjusted=adjusted, pi=pi, ...)
 	mapdata <- data.period$data
 	period <- data.period$period
 	lower <- data.period$lower
 	upper <- data.period$upper
  	un <- data.period$country.codes
-	unmatch <- match(un, iso3166[,'uncode'])
-	unidx <- which(!is.na(unmatch))
+ 	countries.table <- get.countries.table(pred)
+ 	if(!is.null(par.name)) what <- par.name
+ 	e <- new.env()
+	data('iso3166', envir=e)
+	unmatch <- match(un, e$iso3166$uncode)
+	unidx <- which(!is.na(unmatch))	
+	ct.idx <- sapply(un[unidx], function(x, y) which(y==x), countries.table$code)
+	country.names <- countries.table$name[ct.idx]
 	#remove problematic characters
-	names <- iconv(meta$regions$country_name[unidx], "latin1", "ASCII", "?") 
-	data <- data.frame(un=un[unidx], name=names, 
-						iso=iso3166[,'charcode'][unmatch][unidx])
-	if(!is.null(par.name)) what <- par.name
+	country.names <- iconv(country.names, "latin1", "ASCII", "?") 
+	data <- data.frame(un=un[unidx], name=country.names, 
+						iso=e$iso3166$charcode[unmatch][unidx])	
 	data[[what]] <- mapdata[unidx]
 	if(!is.null(lower)) { # confidence intervals defined
 		lower.name <- paste('lower_', pi, sep='')
 		upper.name <- paste('upper_', pi, sep='')
 		data[[lower.name]] <- round(lower[unidx], 2)
 		data[[upper.name]] <- round(upper[unidx], 2)
-		data$pi <- paste(iso3166[,'charcode'][unmatch][unidx], ': ', pi, '% CI (', data[[lower.name]], ', ', 
+		data$pi <- paste(e$iso3166$charcode[unmatch][unidx], ': ', pi, '% CI (', data[[lower.name]], ', ', 
 				data[[upper.name]], ')', sep='')
 		hovervar <- 'pi'
 	} else { # no confidence intervals
@@ -831,7 +841,7 @@ bdem.map.gvis.bayesTFR.prediction <- function(pred, projection.year=NULL, quanti
 				colors=paste('[', paste(col, collapse=', '), ']')))
 
     #geo$html$caption <- paste(title, 'in', period,'<br>\n')
-    geo$html$caption <- paste(title, period, .map.main.default(pred), quantile)
+    geo$html$caption <- paste(title, period, .map.main.default(pred, data.period), quantile)
     bdem.data <- data[,c('un', 'iso', 'name', what, lower.name, upper.name)]
 	gvis.table <- gvisTable(bdem.data, 
 							options=list(width=600, height=600, page='disable', pageSize=198))

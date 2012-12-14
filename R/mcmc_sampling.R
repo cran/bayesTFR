@@ -3,7 +3,7 @@
 # MCMC sampling for DLpar for UN estimates
 #########################################################
 
-tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE) {
+tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE, verbose.iter=10) {
 
 	if (!is.null(mcmc$rng.state)) .Random.seed <- mcmc$rng.state
     nr_simu <- mcmc$iter
@@ -47,6 +47,8 @@ tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE) {
     a_delta <- nu_deltaD/2
     prod_delta0 <- mcmc$meta$nu.delta0*mcmc$meta$delta0^2 
     
+    suppl.T <- if(!is.null(mcmc$meta$suppl.data$regions)) mcmc$meta$suppl.data$T_end else 0
+    
     mcenv <- as.environment(mcmc) # Create an environment for the mcmc stuff in order to avoid 
 					   			  # copying of the mcmc list 
     
@@ -64,16 +66,18 @@ tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE) {
   	# sd_Tc with sigma0 and sd_tau_eps
     # the non-constant variance is sum of sigma0 and add_to_sd_Tc
     # matrix with each column one country
-    mcenv$add_to_sd_Tc <- matrix(NA, mcenv$meta$T_end-1, nr_countries_all)
+    mcenv$add_to_sd_Tc <- matrix(NA, mcenv$meta$T_end-1+suppl.T, nr_countries_all)
     for (country in 1:nr_countries_all){
     	# could exclude 1:(tau_c-1) here
-        mcenv$add_to_sd_Tc[,country] <-  
-                      (mcenv$meta$tfr_matrix[-mcenv$meta$T_end_c[country],country] - mcenv$S_sd)*
-                       ifelse(mcenv$meta$tfr_matrix[-mcenv$meta$T_end_c[country],country] > mcenv$S_sd, 
-                                                -mcenv$a_sd, mcenv$b_sd)
+    	this.data <- get.observed.tfr(country, mcenv$meta)[1:(mcenv$meta$T_end_c[country]-1)]
+        mcenv$add_to_sd_Tc[1:(mcenv$meta$T_end_c[country]-1),country] <- (
+        				this.data - mcenv$S_sd)*ifelse(this.data > mcenv$S_sd, -mcenv$a_sd, mcenv$b_sd)
 	}
-	
-  	mcenv$mean_eps_Tc = matrix(0, mcenv$meta$T_end -1, nr_countries_all)
+	mcenv$const_sd_dummie_Tc <- matrix(0, mcenv$meta$T_end-1+suppl.T, nr_countries_all)
+	mid.years <- as.integer(c(if(suppl.T > 0) rownames(mcenv$meta$suppl.data$tfr_matrix) else c(), rownames(mcenv$meta$tfr_matrix)))
+	mcenv$const_sd_dummie_Tc[mid.years[-length(mid.years)] < 1975,] <- 1
+
+  	mcenv$mean_eps_Tc <- matrix(0, mcenv$meta$T_end -1+suppl.T, nr_countries_all)
     idx.tau_c.id.notearly.all <- matrix(c(mcenv$meta$tau_c[id_notearly_all], id_notearly_all), ncol=2)
 	mcenv$mean_eps_Tc[idx.tau_c.id.notearly.all] <- mcenv$mean_eps_tau
 	
@@ -82,9 +86,9 @@ tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE) {
     # Start MCMC
 	############
     for (simu in start.iter:nr_simu) {
-    	if(verbose || (simu %% 10 == 0))
+    	if(verbose.iter > 0 && (simu %% verbose.iter == 0))
         	cat('\nIteration:', simu, '--', date())
-
+        unblock.gtk('bDem.TFRmcmc')
         #################################################################
         ## a_sd, b_sd, f_sd and sigma0
         #################################################################
@@ -191,9 +195,18 @@ tfr.mcmc.sampling <- function(mcmc, thin=1, start.iter=2, verbose=FALSE) {
 	return(mcmc)
 }
 
+unblock.gtk <- function(option, options.list=NULL) {
+	if(!getOption(option, default=FALSE)) return()
+	if(!is.null(options.list)) options(options.list)
+	# This is to unblock the GUI, if the run is invoked from bayesDem
+	# In such a case the gtk libraries are already loaded
+	while(do.call('gtkEventsPending', list()))
+		do.call('gtkMainIteration', list())
+
+}
 
 tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample,
-											 iter=NULL, burnin=2000, verbose=FALSE) {
+											 iter=NULL, burnin=2000, verbose=FALSE, verbose.iter=100) {
 	#run mcmc sampling for countries given by the index 'countries'
 	nr_simu <- iter
 	if (is.null(iter))
@@ -209,8 +222,10 @@ tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample
     id_early <- mcmc$meta$id_early[is.element(mcmc$meta$id_early, countries)]
     id_notearly <- mcmc$meta$id_notearly[is.element(mcmc$meta$id_notearly, countries)]
 	    
-	const_sd_dummie_Tc_extra <- matrix(0, mcmc$meta$T_end-1, nr_countries)
-	const_sd_dummie_Tc_extra[1:5,] <- 1
+	suppl.T <- if(!is.null(mcmc$meta$suppl.data$regions)) mcmc$meta$suppl.data$T_end else 0
+	const_sd_dummie_Tc_extra <- matrix(0, mcmc$meta$T_end-1+suppl.T, nr_countries)
+	mid.years <- as.integer(c(if(suppl.T > 0) rownames(mcmc$meta$suppl.data$tfr_matrix) else c(), rownames(mcmc$meta$tfr_matrix)))
+	const_sd_dummie_Tc_extra[mid.years[-length(mid.years)] < 1975,] <- 1
 	
 	# get values of the hyperparameters (sample from the posterior)
     hyperparameter.names <- tfr.parameter.names(trans=FALSE)
@@ -239,8 +254,9 @@ tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample
     # Start MCMC
 	############
     for (simu in 1:nr_simu) {
-        if(verbose || (simu %% 10 == 0))
+        if(verbose.iter > 0 && (simu %% verbose.iter == 0))
 			cat('\nIteration:', simu, '--', date())
+			unblock.gtk('bDem.TFRmcmcExtra')
         # set hyperparameters for this iteration
         for (par in hyperparameter.names) {
         	if(is.null(dim(hyperparameters[[par]]))) {
@@ -252,16 +268,15 @@ tfr.mcmc.sampling.extra <- function(mcmc, mcmc.list, countries, posterior.sample
         # compute eps_T, mean_eps_t and sd_Tc
         if(is.null(mcenv$eps_Tc)) mcenv$eps_Tc <- get_eps_T_all(mcenv)
          	
-        add_to_sd_Tc_extra <- matrix(NA, mcenv$meta$T_end-1, nr_countries)
+        add_to_sd_Tc_extra <- matrix(NA, mcenv$meta$T_end-1 + suppl.T, nr_countries)
     	for (icountry in 1:length(countries)){
     		country <- countries[icountry]
-			add_to_sd_Tc_extra[,icountry] <-  
-                      (mcenv$meta$tfr_matrix[-mcenv$meta$T_end_c[country],country] - mcenv$S_sd)*
-                       ifelse(mcenv$meta$tfr_matrix[-mcenv$meta$T_end_c[country],country] > mcenv$S_sd, 
-                                                -mcenv$a_sd, mcenv$b_sd)
+    		this.data <- get.observed.tfr(country, mcenv$meta)[1:(mcenv$meta$T_end_c[country]-1)]
+			add_to_sd_Tc_extra[1:(mcenv$meta$T_end_c[country]-1),icountry] <- (
+						this.data - mcenv$S_sd)*ifelse(this.data > mcenv$S_sd, -mcenv$a_sd, mcenv$b_sd)
 		}
-		mcenv$mean_eps_Tc <- matrix(0, mcenv$meta$T_end -1, nr_countries_all)
-        mcenv$sd_Tc <- matrix(NA, mcenv$meta$T_end -1, nr_countries_all)
+		mcenv$mean_eps_Tc <- matrix(0, mcenv$meta$T_end -1 + suppl.T, nr_countries_all)
+        mcenv$sd_Tc <- matrix(NA, mcenv$meta$T_end -1 + suppl.T, nr_countries_all)
        	mcenv$sd_Tc[,countries] <- ifelse(const_sd_dummie_Tc_extra==1, 
          						mcenv$const_sd, 1)*
             			   ifelse((mcenv$sigma0 + add_to_sd_Tc_extra)>0, mcenv$sigma0 + add_to_sd_Tc_extra, 
