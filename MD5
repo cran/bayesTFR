@@ -1,5 +1,5 @@
-b3930134feafbc4847ca739be2d1748c *ChangeLog
-51bbf94ad042bc7f642fa0b60d4dbbe0 *DESCRIPTION
+5d69f79d420e0f4ce62172ccda8f8a4d *ChangeLog
+42e09b99effb233c1ea94a49289c3b1e *DESCRIPTION
 cdf2e7c9f8f77d4cf12877a889c41fb8 *NAMESPACE
 6c7133d0a6074f77c614178add10c05e *R/diagnostics.R
 06d9127c629082262b426a0f737ed27e *R/get_outputs.R
@@ -12,7 +12,7 @@ f6e1abb89682612cbe22fc1b7b178ec7 *R/mcmc_update.R
 48c155086440af2751b34db630e85f83 *R/predict_tfr.R
 da29d64b05c9bc4417ffe0be81dbfb35 *R/run_mcmc.R
 97fb835e271cbb812fac6d59bb8d2083 *R/wpp_data.R
-93900ea3bb7f092316d52c83ec72fcad *R/zzz.R
+aaa0d9ee049842d1210f62c19acc69c0 *R/zzz.R
 45d32f6254b4d9f4a820b091dd669cb2 *data/UN2008.R
 322f3efe5931253f08c98075445ff8e4 *data/UN2008.txt
 aa777f5c37cab42a97fead1c92b9f7fe *data/UN2008_with_last_obs.R
@@ -1043,7 +1043,7 @@ f920cd1e64241e1844ab554909a9f432 *inst/ex-data/bayesTFR.output/predictions/traj_
 1020d812472c4f11d25f52f3f10e001e *man/UN_time.Rd
 fa6b38c7e40b611d514ab0a3c3d9c313 *man/UN_variants.Rd
 c99c70bce2f0d97710b09377e26a7a0b *man/bayesTFR-internal.Rd
-7754eea2af3b8be092ac8caeae6ed783 *man/bayesTFR-package.Rd
+453a8160c8130aef70acbbba4897e782 *man/bayesTFR-package.Rd
 7c053a2f13ef6acef895668c7808ffc4 *man/bayesTFR.mcmc.Rd
 3f1d962e8f72c73d41876a5a113e8785 *man/bayesTFR.mcmc.meta.Rd
 2ce563419cd219aac83894529a723b25 *man/coda.mcmc.list.Rd
@@ -1079,5 +1079,5 @@ a9e5b658defb30a6e53aa8ba2930be8a *man/tfr.diagnose.Rd
 b1a58c848b6f6383a72c5c9937d6ba97 *man/tfr.raftery.diag.Rd
 7709d25ba45c27ca9df53e6916f60018 *man/write.projection.summary.Rd
 bdadd9369e6bbcbb84991c073706ed90 *src/mcmc_likelihood.c
-d4bbef168099d3548438ba0418f9be1a *tests/run_tests.R
+bfe76cf626d64c5dd9de520d2de2e1a3 *tests/run_tests.R
 e81f248e63774402f0ea233d1ce77606 *tests/test_functions.R
