@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-double test_rnorm(double *mu, double *sigma, double *t){
+/*double test_rnorm(double *mu, double *sigma, double *t){
 	double m, s;
 	m = *mu;
 	s = *sigma;
@@ -16,7 +16,7 @@ double test_rnorm(double *mu, double *sigma, double *t){
 	GetRNGstate();
 
 	PutRNGstate();
-}
+}*/
 
 double sum(double *x, int dim) {
 	double s;
@@ -61,3 +61,15 @@ void doDLcurve(double *DLpar, double *tfr, double *p1, double *p2, int *dim_tfr,
     	}
     }
 }
+
+void dnormtrunc(double *x, double *mu, double *sigma, 
+		double low, double high, int dim_out, double *out){
+	int i;
+	for (i=0; i< dim_out; i++) {
+		if(x[i] < low || x[i] > high) out[i] = 0;
+		else 
+  		out[i] = dnorm(x[i],mu[i],sigma[i], 0)/(pnorm(high,mu[i],sigma[i],1,0)-pnorm(low,mu[i],sigma[i],1,0));
+  	}
+	return;
+}
+

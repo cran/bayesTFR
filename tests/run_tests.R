@@ -7,7 +7,6 @@ test.load.UNlocations()
 test.create.tfr.matrix()
 test.existing.simulation()
 
-
 ## disable the following tests when submitting to CRAN
 ## to speed-up the checking procedure
 # test.DLcurve()

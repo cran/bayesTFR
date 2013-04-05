@@ -223,9 +223,16 @@ do.meta.ini <- function(meta, tfr.with.regions, my.tfr.file=NULL, proposal_cov_g
     nr_countries_estimation <- tfr.with.regions$nr_countries_estimation
                                                    
     # uniform prior for U_c, make lower bound country specific
-    tfr_min_c <- apply(updated.tfr.matrix, 2, min, na.rm = TRUE)
+    if(any(apply(updated.tfr.matrix, 2, function(x) all(is.na(x))))) { # some countries start Phase III before 1950
+    	tfr_min_c <- c()
+ 		# loop over countries to find minimum
+ 		for (country in 1:nr_countries){
+    		data <- get.observed.with.supplemental(country, updated.tfr.matrix, suppl.data)
+    		tfr_min_c <- c(tfr_min_c, min(data, na.rm=TRUE))
+    	}
+    } else
+    	tfr_min_c <- apply(updated.tfr.matrix, 2, min, na.rm = TRUE)
     lower_U_c <- ifelse(tfr_min_c > meta$U.c.low.base, tfr_min_c, meta$U.c.low.base)
-		
 	prop_cov_gammas <- array(NA, c(nr_countries,3,3))
 	if(use.average.gammas.cov) {
 		cov.to.average <- get.cov.gammas(sim.dir=meta$output.dir, burnin=burnin)$values
@@ -348,7 +355,8 @@ mcmc.ini <- function(chain.id, mcmc.meta, iter=100,
     T_end = mcmc.meta$T_end
    	Triangle_c4 <- rep(Triangle_c4.ini, nr_countries)
     for (country in mcmc.meta$id_DL) {
-    	minf <- min(mcmc.meta$tfr_matrix[, country], na.rm = TRUE)
+    	data <- get.observed.tfr(country, mcmc.meta)
+    	minf <- min(data, na.rm = TRUE)
         if (minf < mcmc.meta$Triangle_c4.up) {
         	Triangle_c4[country] = max(mcmc.meta$Triangle_c4.low+0.0001, minf)
           }
