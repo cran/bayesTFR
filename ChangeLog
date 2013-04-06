@@ -1,3 +1,50 @@
+3.0-8 (4/5/2013)
+-----
+.find.package replaced by find.package.
+
+Preliminary wpp2012 data removed (final revision to be added soon). 
+
+3.0-7 (3/17/2013)
+-----
+Change in DLcurve.plot - points from different phases got different shape.
+
+3.0-6 (3/16/2013)
+-----
+DLcurve.plot can be used for countries that did not enter phase II.
+Observed points in DLcurve.plot now also contain points from Phase I (as empty circles).
+
+Bug in tfr.predict fixed affecting countries that did not enter phase II.
+
+3.0-5 (3/14/2013)
+-----
+Revision number in summary files is determined automatically from wpp.year.
+
+Fix of prediction adjustment.
+
+3.0-4 (3/3/2013)
+-----
+Two columns (indicatorID and sexID) added to the projection summary file.
+
+Bug in tfr.median.adjust fixed.
+
+Fixed an issue when Phase III starts before 1950.
+
+3.0-2/3 (2/28/2013)
+-----
+Added start.year into make.tfr.prediction. Now projections that start before (or at) 'present.year' are allowed.
+
+3.0-1 (2/27/2013)
+-----
+Preliminary wpp 2012 data added.
+
+Bug in tfr.plot.trajectories fixed.
+
+Bug in tfr.median.adjust fixed.
+
+3.0-0 (2/16/2013)
+-----
+Simulation of Phase III BHM added -> many new functions 
+
 2.1-1 (1/3/2013)
 -----
 .First.lib and .Last.lib changed to .onLoad and .onUnload

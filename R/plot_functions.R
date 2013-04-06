@@ -6,7 +6,7 @@ DLcurve.plot.all <- function (mcmc.list = NULL, sim.dir = NULL,
 	if(is.null(mcmc.list)) mcmc.list <- get.tfr.mcmc(sim.dir=sim.dir, verbose=verbose, burnin=burnin)
 	mcmc.list <- get.mcmc.list(mcmc.list)
 	meta <- mcmc.list[[1]]$meta
-	.do.plot.all.country.loop(as.character(country.names(meta))[meta$id_DL], meta, output.dir, DLcurve.plot, output.type=output.type, 
+	.do.plot.all.country.loop(as.character(country.names(meta)), meta, output.dir, DLcurve.plot, output.type=output.type, 
 		file.prefix='DLplot', plot.type='DL graph', verbose=verbose, mcmc.list = mcmc.list, burnin = burnin, ...)
 }
 
@@ -17,10 +17,23 @@ stop.if.country.not.DL <- function(country.obj, meta) {
 
 tfr.get.dlcurves <- function(x, mcmc.list, country.code, country.index, burnin, nr.curves, predictive.distr=FALSE) {
     dlc <- c()
-    U.var <- paste("U_c", country.code, sep = "")
-    d.var <- paste("d_c", country.code, sep = "")
-    Triangle_c4.var <- paste("Triangle_c4_c", country.code, sep = "")
-    gamma.vars <- paste("gamma_", 1:3, "_c", country.code, sep = "")
+    cspec <- TRUE
+    if(!is.element(country.index, mcmc.list[[1]]$meta$id_Tistau)) {
+    	U.var <- paste("U_c", country.code, sep = "")
+    	d.var <- paste("d_c", country.code, sep = "")
+    	Triangle_c4.var <- paste("Triangle_c4_c", country.code, sep = "")
+    	gamma.vars <- paste("gamma_", 1:3, "_c", country.code, sep = "")
+    } else {
+    	U.var <- "U"
+    	d.var <- "d"
+    	Triangle_c4.var <- "Triangle_c4"
+    	gamma.vars <- paste("gamma_", 1:3, sep = "")
+    	alpha.vars <- paste('alpha_',1:3, sep='')
+		delta.vars <- paste('delta_',1:3, sep='')
+		Uvalue = get.observed.tfr(country.index, mcmc.list[[1]]$meta, 
+										'tfr_matrix_all')[mcmc.list[[1]]$meta$tau_c[country.index]]
+    	cspec <- FALSE
+    }
     # Compute the quantiles on a sample of at least 2000.   
     nr.curves.from.mc <- if (!is.null(nr.curves)) ceiling(max(nr.curves, 2000)/length(mcmc.list))
     						else NULL
@@ -28,13 +41,33 @@ tfr.get.dlcurves <- function(x, mcmc.list, country.code, country.index, burnin, 
     	th.burnin <- get.thinned.burnin(mcmc,burnin)
     	thincurves.mc <- get.thinning.index(nr.points=nr.curves.from.mc, 
             all.points=mcmc$length - th.burnin)
-        traces <- load.tfr.parameter.traces.cs(mcmc, country.code, 
+        if(cspec) # country specific
+        	traces <- data.frame(load.tfr.parameter.traces.cs(mcmc, country.code, 
         						burnin=th.burnin, 
-								thinning.index=thincurves.mc$index)
+								thinning.index=thincurves.mc$index))
+		else { #Tistau country. Use hierarchical distr.
+			traces <- data.frame(load.tfr.parameter.traces(mcmc, 
+        						burnin=th.burnin, 
+								thinning.index=thincurves.mc$index))
+			ltraces <- nrow(traces)
+			for (i in 1:3){
+				gamma <- rnorm(ltraces, mean = traces[,alpha.vars[i]], 
+ 										sd = traces[,delta.vars[i]])
+				traces <- cbind(traces, gamma)
+				colnames(traces)[ncol(traces)] <- gamma.vars[i]
+			}
+			Triangle4_tr_s <- rnorm(ltraces, mean = traces[,'Triangle4'], sd = traces[, 'delta4'])
+			traces <- cbind(traces, 
+						Triangle_c4=( mcmc$meta$Triangle_c4.up*exp(Triangle4_tr_s) + mcmc$meta$Triangle_c4.low)/(1+exp(Triangle4_tr_s)))
+			d_tr_s <- rnorm(ltraces, mean = traces[,'chi'], sd = traces[,'psi'])
+			traces <- cbind(traces,   d=(mcmc$meta$d.up*(exp(d_tr_s) + mcmc$meta$d.low)/(1+exp(d_tr_s))),
+									U=rep(Uvalue, ltraces))
+		}
         theta <- (traces[, U.var] - traces[, Triangle_c4.var] ) * 
             exp(traces[, gamma.vars, drop=FALSE])/apply(exp(traces[,gamma.vars, drop=FALSE]), 1, sum)
         theta <- cbind(theta, traces[, Triangle_c4.var], traces[, d.var])
         dl <- t(apply(theta, 1, DLcurve, tfr = x, p1 = mcmc$meta$dl.p1, p2 = mcmc$meta$dl.p2))
+        #stop('')
         if(length(x) == 1) dl <- t(dl)
         if(predictive.distr) {
 			errors <- matrix(NA, nrow=dim(dl)[1], ncol=dim(dl)[2])
@@ -71,15 +104,19 @@ DLcurve.plot <- function (mcmc.list, country, burnin = NULL, pi = 80, tfr.max = 
     mcmc.list <- get.mcmc.list(mcmc.list)
     meta <- mcmc.list[[1]]$meta
     country <- get.country.object(country, meta)
-    stop.if.country.not.DL(country, meta)
+    #stop.if.country.not.DL(country, meta)
     tfr_plot <- seq(0, tfr.max, 0.1)
     dlc <- tfr.get.dlcurves(tfr_plot, mcmc.list, country$code, country$index, burnin, nr.curves, 
     						predictive.distr=predictive.distr)
     miny <- min(dlc)
     maxy <- max(dlc)
-    obs.data <- get.observed.tfr(country$index, meta)[1:meta$T_end_c[country$index]]
+    obs.data <- get.observed.tfr(country$index, meta, 'tfr_matrix_observed', 'tfr_matrix_all')[1:meta$T_end_c[country$index]]
     decr <- -diff(obs.data)
+    dl.obs.idx <- if(max(meta$tau_c[country$index],1) >= meta$lambda_c[country$index]) c()
+    				else seq(max(meta$tau_c[country$index],1), meta$lambda_c[country$index]-1)
+    p3.obs.idx <- if(meta$lambda_c[country$index]>length(decr)) c() else seq(meta$lambda_c[country$index], length(decr))
     maxy <- max(maxy, decr, na.rm=TRUE)
+    miny <- min(miny, decr, na.rm=TRUE)
     thincurves <- get.thinning.index(nr.curves, dim(dlc)[1])
     ltype <- "l"
     if (thincurves$nr.points == 0) {
@@ -109,9 +146,32 @@ DLcurve.plot <- function (mcmc.list, country, burnin = NULL, pi = 80, tfr.max = 
         lines(dlpi[2, ] ~ tfr_plot, col = "red", lty = lty[i], 
             lwd = 2)
     }
-    points(decr ~ obs.data[-length(obs.data)], pch = 19)
-    legend("topright", legend = c("median", paste("PI", pi)), 
-        lty = c(1, lty), bty = "n", col = "red")
+    obs.legend <- list(legend=c(), pch=c(), bg=c())
+    if(length(dl.obs.idx) > 0 && any(!is.na(decr[dl.obs.idx]))) {
+    	points(decr[dl.obs.idx] ~ obs.data[-length(obs.data)][dl.obs.idx], pch = 19)
+    	obs.legend$legend <- c(obs.legend$legend, 'Phase II data')
+    	obs.legend$pch <- c(obs.legend$pch, 19)
+    	#obs.legend$bg <- c(obs.legend$bg, 'black')
+    }
+    endpI <- if(length(dl.obs.idx)==0) max(meta$tau_c[country$index],1) else dl.obs.idx[1]-1
+    if((endpI > 1) && any(!is.na(decr[1:endpI])))  {# draw phase I points
+    	points(decr[1:endpI] ~ obs.data[-length(obs.data)][1:endpI], pch=0)
+    	obs.legend$legend <- c(obs.legend$legend, 'Phase I data')
+    	obs.legend$pch <- c(obs.legend$pch, 0)
+    	#obs.legend$bg <- c(obs.legend$bg, 'white')
+    }
+    if(length(p3.obs.idx)>0) {
+    	points(decr[p3.obs.idx] ~ obs.data[-length(obs.data)][p3.obs.idx], pch = 2, bg = "grey") # draw phase III points
+    	obs.legend$legend <- c(obs.legend$legend, 'Phase III data')
+    	obs.legend$pch <- c(obs.legend$pch, 2)
+    	#obs.legend$bg <- c(obs.legend$bg, 'grey')
+    }
+    legend("topright", legend = c("median", paste("PI", pi), obs.legend$legend), 
+        lty = c(1, lty, rep(0,length(obs.legend$pch))), bty = "n", 
+        col = c(rep("red", 1+length(pi)), rep('black',length(obs.legend$pch))), 
+        pch=c(rep(-1,length(pi)+1), obs.legend$pch),
+        #bg=c(rep(-1,length(pi)+1), obs.legend$bg),
+        )
 }
 
 .get.trajectories.table <- function(tfr.pred, country, obs.data, pi, pred.median, cqp, half.child.variant=FALSE) {
@@ -153,6 +213,7 @@ tfr.trajectories.table <- function(tfr.pred, country, pi=c(80, 95), half.child.v
 	}
 	country <- get.country.object(country, tfr.pred$mcmc.set$meta)
 	obs.data <- get.data.imputed.for.country(tfr.pred, country$index)
+	if(!is.null(tfr.pred$present.year.index)) obs.data <- obs.data[1:min(length(obs.data), tfr.pred$present.year.index.all)]
 	pred.median <- get.median.from.prediction(tfr.pred, country$index, country$code)
 	trajectories <- get.trajectories(tfr.pred, country$code)
 	cqp <- list()
@@ -184,7 +245,8 @@ get.trajectories <- function(tfr.pred, country, nr.traj=NULL, adjusted=TRUE, bas
 			shift <- get.tfr.shift(country, tfr.pred)
 	 		if(!is.null(shift)) trajectories <- trajectories + shift
 	 	}
-	 	rownames(trajectories) <- get.prediction.years(tfr.pred$mcmc.set$meta, dim(trajectories)[1])
+	 	rownames(trajectories) <- get.prediction.years(tfr.pred$mcmc.set$meta, dim(trajectories)[1], 
+	 													present.year.index=tfr.pred$present.year.index)
 	 }
 	return(list(trajectories=trajectories, index=traj.idx))
 }
@@ -305,18 +367,21 @@ tfr.trajectories.plot <- function(tfr.pred, country, pi=c(80, 95),
 	}
 	country <- get.country.object(country, tfr.pred$mcmc.set$meta)
 	tfr_observed <- get.observed.tfr(country$index, tfr.pred$mcmc.set$meta, 'tfr_matrix_observed', 'tfr_matrix_all')
-	T_end_c <- tfr.pred$mcmc.set$meta$T_end_c
+	T_end_c <- pmin(tfr.pred$mcmc.set$meta$T_end_c, tfr.pred$present.year.index.all)
 	tfr_matrix_reconstructed <- get.tfr.reconstructed(tfr.pred$tfr_matrix_reconstructed, tfr.pred$mcmc.set$meta)
 	suppl.T <- length(tfr_observed) - tfr.pred$mcmc.set$meta$T_end
 	y1.part1 <- tfr_observed[1:T_end_c[country$index]]
 	y1.part1 <- y1.part1[!is.na(y1.part1)]
 	lpart1 <- length(y1.part1)
 	y1.part2 <- NULL
-	lpart2 <- tfr.pred$mcmc.set$meta$T_end - T_end_c[country$index] + suppl.T
-	if (lpart2 > 0) 
-		y1.part2 <- tfr_matrix_reconstructed[(T_end_c[country$index]+1-suppl.T):nrow(tfr_matrix_reconstructed),country$index]
+	lpart2 <- min(tfr.pred$mcmc.set$meta$T_end, tfr.pred$present.year.index) - T_end_c[country$index] + suppl.T
+	if (lpart2 > 0) {
+		p2idx <- (T_end_c[country$index]+1-suppl.T):nrow(tfr_matrix_reconstructed)
+		y1.part2 <- tfr_matrix_reconstructed[p2idx,country$index]
+		names(y1.part2) <- rownames(tfr_matrix_reconstructed)[p2idx]
+	}
 	x1 <- as.integer(c(names(y1.part1), names(y1.part2)))
-	x2 <- as.numeric(dimnames(tfr.pred$quantiles)[[3]])	
+	x2 <- as.numeric(dimnames(tfr.pred$quantiles)[[3]])
 	trajectories <- get.trajectories(tfr.pred, country$code, nr.traj, typical.trajectory=typical.trajectory)
 	# plot historical data: observed
 	if (!add) {
@@ -525,6 +590,33 @@ tfr.partraces.cs.plot <- function(country, mcmc.list=NULL, sim.dir=file.path(get
 		country=country.obj$code, par.names=par.names, dev.ncol=dev.ncol, ...)
 }
 
+tfr3.partraces.plot <- function(mcmc.list=NULL, sim.dir=file.path(getwd(), 'bayesTFR.output'), 
+									chain.ids=NULL, par.names=tfr3.parameter.names(), 
+									nr.points=NULL, dev.ncol=3, low.memory=TRUE, ...) {
+	if (is.null(mcmc.list))
+		mcmc.list <- get.tfr3.mcmc(sim.dir, low.memory=low.memory)
+	else if(class(mcmc.list)=='bayesTFR.prediction')
+			stop('Function not available for bayesTFR.prediction objects.')
+	tfr.partraces.plot(mcmc.list, sim.dir=NULL, chain.ids=chain.ids, par.names=par.names, 
+						nr.points=nr.points, dev.ncol=dev.ncol, ...)
+}
+
+tfr3.partraces.cs.plot <- function(country, mcmc.list=NULL, sim.dir=file.path(getwd(), 'bayesTFR.output'),
+									chain.ids=NULL, par.names=tfr3.parameter.names.cs(), 
+									nr.points=NULL, dev.ncol=2, low.memory=TRUE, ...) {
+	if (is.null(mcmc.list))
+		mcmc.list <- get.tfr3.mcmc(sim.dir, low.memory=low.memory)
+	else if(class(mcmc.list)=='bayesTFR.prediction')
+			stop('Function not available for bayesTFR.prediction objects.')
+	mcmc.list <- get.mcmc.list(mcmc.list)
+	country.obj <- get.country.object(country, mcmc.list[[1]]$meta)
+	if (is.null(country.obj$name))
+		stop('Country ', country, ' not found.')
+	do.plot.tfr.partraces(mcmc.list, 'load.tfr.parameter.traces.cs', 
+		main.postfix=paste('(',country.obj$name,')', sep=''), chain.ids=chain.ids, nr.points=nr.points, 
+		country=country.obj$code, par.names=par.names, dev.ncol=dev.ncol, ...)
+}
+		
 do.plot.tfr.pardensity <- function(mcmc.list, func, par.names, par.names.ext, main.postfix='', 
 								func.args=NULL, chain.ids=NULL, burnin=NULL, dev.ncol=5, ...) {
 	if(class(mcmc.list) == 'bayesTFR.prediction') {
@@ -568,7 +660,7 @@ tfr.pardensity.plot <- function(mcmc.list=NULL, sim.dir=file.path(getwd(), 'baye
 		mcmc.list <- get.tfr.mcmc(sim.dir, low.memory=low.memory)
 	par.names.ext <- get.full.par.names(par.names, tfr.parameter.names.extended())
 	if(length(par.names.ext) <= 0)
-		stop('Parameter names are not valid country-specific parameters.\nUse function tfr.parameter.names(...) or valid parameter names.')
+		stop('Parameter names are not valid parameters.\nUse function tfr.parameter.names(...) or valid parameter names.')
 	do.plot.tfr.pardensity(mcmc.list, 'get.tfr.parameter.traces', chain.ids=chain.ids, par.names=par.names,
 							par.names.ext=par.names.ext,
 							burnin=burnin, dev.ncol=dev.ncol, ...)
@@ -588,6 +680,39 @@ tfr.pardensity.cs.plot <- function(country, mcmc.list=NULL, sim.dir=file.path(ge
 											tfr.parameter.names.cs.extended(country.obj$code))
 	if(length(par.names.ext) <= 0)
 		stop('Parameter names are not valid country-specific parameters.\nUse function tfr.parameter.names.cs(...) or valid parameter names.')
+	do.plot.tfr.pardensity(mcmc.list, 'get.tfr.parameter.traces.cs', chain.ids=chain.ids, par.names=par.names,
+							par.names.ext=par.names.ext,
+							main.postfix=paste('(',country.obj$name,')', sep=''),
+							func.args=list(country.obj=country.obj),
+							burnin=burnin, dev.ncol=dev.ncol, ...)
+}
+
+tfr3.pardensity.plot <- function(mcmc.list=NULL, sim.dir=file.path(getwd(), 'bayesTFR.output'), 
+									chain.ids=NULL, par.names=tfr3.parameter.names(), 
+									burnin=NULL, dev.ncol=3, low.memory=TRUE, ...) {
+	if (is.null(mcmc.list))
+		mcmc.list <- get.tfr3.mcmc(sim.dir, low.memory=low.memory)
+	else if(class(mcmc.list)=='bayesTFR.prediction')
+			stop('Function not available for bayesTFR.prediction objects.')
+	do.plot.tfr.pardensity(mcmc.list, 'get.tfr.parameter.traces', chain.ids=chain.ids, par.names=par.names,
+							par.names.ext=par.names,
+							burnin=burnin, dev.ncol=dev.ncol, ...)
+}
+
+tfr3.pardensity.cs.plot <- function(country, mcmc.list=NULL, sim.dir=file.path(getwd(), 'bayesTFR.output'), 
+									chain.ids=NULL, par.names=tfr3.parameter.names.cs(), 
+									burnin=NULL, dev.ncol=2, low.memory=TRUE, ...) {
+	if (is.null(mcmc.list))
+		mcmc.list <- get.tfr3.mcmc(sim.dir, low.memory=low.memory)
+	else if(class(mcmc.list)=='bayesTFR.prediction')
+			stop('Function not available for bayesTFR.prediction objects.')
+	mcmc.l <- get.mcmc.list(mcmc.list)
+	country.obj <- get.country.object(country, mcmc.l[[1]]$meta)
+	if (is.null(country.obj$name))
+		stop('Country ', country, ' not found.')
+	par.names.ext <- get.full.par.names.cs(par.names, paste(par.names, '_c', country.obj$code, sep=''))
+	if(length(par.names.ext) <= 0)
+		stop('Parameter names are not valid country-specific parameters.\nUse function tfr3.parameter.names.cs(...) or valid parameter names.')
 	do.plot.tfr.pardensity(mcmc.list, 'get.tfr.parameter.traces.cs', chain.ids=chain.ids, par.names=par.names,
 							par.names.ext=par.names.ext,
 							main.postfix=paste('(',country.obj$name,')', sep=''),
@@ -699,7 +824,7 @@ get.data.for.worldmap.bayesTFR.prediction <- function(pred, quantile=0.5, year=N
 		if (par.name == 'lambda') {
 			tfr <- get.data.imputed(pred)
 			tfr.years <- bayesTFR:::get.estimation.years(meta)
-			all.years <- c(tfr.years, bayesTFR:::get.prediction.years(meta, pred$nr.projections+1)[-1])
+			all.years <- c(tfr.years, bayesTFR:::get.prediction.years(meta, pred$nr.projections+1, pred$present.year.index)[-1])
 			nr.data <- pred$nr.projections+dim(tfr)[1]
 			for (country in 1:get.nr.countries(meta)) {
 				country.obj <- get.country.object(country, meta, index=TRUE)
@@ -742,7 +867,8 @@ get.data.for.worldmap.bayesTFR.prediction <- function(pred, quantile=0.5, year=N
 					 '\nCheck arguments "quantile" and "pi".')
 			data <- pred$quantiles[, as.character(quantiles), projection.index]
 			if(adjusted) data <- data + get.tfr.shift.all(pred, projection.index)
-			period <- get.prediction.periods(meta, projection.index)[projection.index]
+			period <- get.prediction.periods(meta, projection.index, 
+								present.year.index=pred$present.year.index)[projection.index]
 		} else {
 			data <- get.data.imputed(pred)[projection.index, ]
 			period <- get.tfr.periods(meta)[projection.index]
@@ -826,7 +952,7 @@ bdem.map.gvis.bayesTFR.prediction <- function(pred, year=NULL, quantile=0.5, pi=
 		upper.name <- paste('upper_', pi, sep='')
 		data[[lower.name]] <- round(lower[unidx], 2)
 		data[[upper.name]] <- round(upper[unidx], 2)
-		data$pi <- paste(e$iso3166$charcode[unmatch][unidx], ': ', pi, '% CI (', data[[lower.name]], ', ', 
+		data$pi <- paste(e$iso3166$charcode[unmatch][unidx], ': ', pi, '% PI (', data[[lower.name]], ', ', 
 				data[[upper.name]], ')', sep='')
 		hovervar <- 'pi'
 	} else { # no confidence intervals
