@@ -1,5 +1,5 @@
-c453f2c82568a9c25652ec33b520f5a9 *ChangeLog
-2057afbdd9fd8088a4a8089fe64a0ca3 *DESCRIPTION
+eaa37876d5dda1198251fe9b513797a3 *ChangeLog
+c020401cb48f1b25c1ecd92db3190a70 *DESCRIPTION
 190100e0792b6932bb359ffb7a8818ad *NAMESPACE
 9d7ebdab496c7eb345a54f93e18c9a4a *R/diagnostics.R
 97e9617e62ed084273857a527a640fc9 *R/get_outputs.R
@@ -10,8 +10,8 @@ c453f2c82568a9c25652ec33b520f5a9 *ChangeLog
 f5185c7dc9064a75edabf91d39ca2dbc *R/mcmc_storage.R
 53d4ce84e70aba0e5377ae902e79ffe7 *R/mcmc_update.R
 7e078336083a5e3caa3e8b34c1252fec *R/plot_functions.R
-7f932c09b2114f05e3b8cb4a84db2301 *R/predict_tfr.R
-ec8d9ebc34cf7e01c2d4e503ae596b27 *R/run_mcmc.R
+2349a8b546709d2f011ee99cf42b1433 *R/predict_tfr.R
+d02ad63b50cb1342111a1f4f89e25b3f *R/run_mcmc.R
 69d27beb00314aac8e2970b1c5013a0d *R/run_mcmc3.R
 221bf76fe301da38fbe1222921f1fac7 *R/wpp_data.R
 aaa0d9ee049842d1210f62c19acc69c0 *R/zzz.R
@@ -27,7 +27,7 @@ e639d9b05b77958b5e26f0db0ea7f60a *data/include_2008.R
 72b8d0db43f2685bbde21520f399dc82 *data/include_2012.R
 3c38d1a88d2c443381fda4cee0c8dd28 *data/include_2012.txt
 83b4cc643012c5752eabf85b8fe3655e *data/iso3166.R
-eca91dbc41108bfab8fa4cbb8703dc21 *data/iso3166.txt
+b58fd80f83433eb30945ce85498e38be *data/iso3166.txt
 3b7748cd9eb187c72ba9ce5908ef6141 *data/proposal_cov_gammas_cii.rda
 ed0866ee927ee021a528a12856b021be *inst/CITATION
 6686feb6dee9a4d5f7cd163a113a50c5 *inst/ex-data/bayesTFR.output/bayesTFR.mcmc.meta.rda
@@ -1058,7 +1058,7 @@ d52e91ad26b416dd57d426bc85bdb5ec *inst/extdata/UN2010_last_obs.txt
 1020d812472c4f11d25f52f3f10e001e *man/UN_time.Rd
 fa6b38c7e40b611d514ab0a3c3d9c313 *man/UN_variants.Rd
 483e717e99c9ba1b591baa26aaaf9ab5 *man/bayesTFR-internal.Rd
-e7b35c1bbf6f0ac98a9d017c72791f3c *man/bayesTFR-package.Rd
+27bccf4256a49b98e9c10b6475ae7792 *man/bayesTFR-package.Rd
 857c419667671fcb622e5f17455ae33a *man/bayesTFR.mcmc.Rd
 78f62cd87e3d1b491b7a793db71e6946 *man/bayesTFR.mcmc.meta.Rd
 5665825361aabfa056376c8a1fbe7702 *man/coda.mcmc.list.Rd
@@ -1079,7 +1079,7 @@ bf7f4aafac46f7b89f9c43106dfddcb8 *man/plot-DLcurve.Rd
 af5e313f57ad68724241cc1835832b08 *man/plot-partraces.Rd
 f924eecc687329eb27ffec1efcfe7f92 *man/plot-trajectories.Rd
 293d0b89c6da7a91a0603053e960a2fc *man/predict-tfr.Rd
-0b2b97759b1f091ba672147bf530d9a7 *man/run-mcmc.Rd
+2b5727f6e017fdb3fa50d6dcfc2edac2 *man/run-mcmc.Rd
 028a72cdb8b5c063a50aacb53f6712ce *man/run.tfr.mcmc.extra.Rd
 cfd18fc33623e169eb3bf6616c1204ad *man/run.tfr3.mcmc.Rd
 d5944bb9f24dbfa1a255d360bbbf0e0a *man/summary-convergence.Rd
@@ -1094,4 +1094,4 @@ e9158a2390ec1bada16681113e46ea8f *man/tfr.median.set.Rd
 a0cf9a55d0c096c877aaa0f085861a75 *man/write.projection.summary.Rd
 4e7919686e3be6fea7e31242590080b8 *src/mcmc_likelihood.c
 7b71ff9fb1ce103ec000b4879189d0fa *tests/run_tests.R
-c3c6a4579fdd120d14cd9ae1709f5323 *tests/test_functions.R
+2cd7ddc25db094e66b78caf45f11fc9b *tests/test_functions.R
