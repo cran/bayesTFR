@@ -1,9 +1,28 @@
-4.1.0/1 (1/14/2015) [CRAN]
+4.2-0 (7/9/2015)
+-----
+MCMC outputs now also for back-transformed parameters Triangle_c1-3.
+
+Plotted trajectories are shown in a transparent color.
+
+Imports fixed to comply with the new CRAN policy.
+
+In the manual, a few citations updated.
+
+In tfr.trajectories.plot input to rgb divided by 255 
+(it was not working for other color than black - 
+thanks to Patrick Gerland for finding the bug and fixing it).
+
+Bug fix in creating thinned MCMCs for extra countries.
+
+Default of b.width in run.tfr.mcmc changed to 0.05
+(previous value of 0.02 caused some chains to be stuck)
+
+4.1-0/1 (1/14/2015) [CRAN]
 ------
 Added option of overwriting UNlocations file, i.e. easily include new countries in simulations. 
 For this, function run.tfr.mcmc got an argument "my.locations.file".
 
-4.0.11 (11/21/2014) [CRAN]
+4.0-11 (11/21/2014) [CRAN]
 ------
 Removed usage of snow functions since CRAN doesn't like them.
 
