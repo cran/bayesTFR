@@ -1,18 +1,18 @@
 Package: bayesTFR
-Version: 4.2-0
-Date: 2015-7-9
+Version: 5.0-0
+Date: 2015-12-4
 Title: Bayesian Fertility Projection
 Author: Hana Sevcikova (hanas@uw.edu), Leontine Alkema (alkema@nus.edu.sg), Adrian Raftery (raftery@uw.edu) with code contribution from Bailey Fosdick (bfosdick@uw.edu) and Patrick Gerland (gerland@un.org)
 Maintainer: Hana Sevcikova <hanas@uw.edu>
 Depends: R (>= 2.14.2)
-Imports: mvtnorm, MASS, coda, wpp2012, graphics, grDevices, stats,
+Imports: mvtnorm, MASS, coda, wpp2015, graphics, grDevices, stats,
         utils
-Suggests: rworldmap, snowFT, googleVis, rgdal, rworldxtra, sp, wpp2008,
+Suggests: rworldmap, snowFT, googleVis, rgdal, rworldxtra, sp, wpp2012,
         wpp2010
 Description: Making probabilistic projections of total fertility rate for all countries of the world, using a Bayesian hierarchical model.
 License: GPL (>= 2)
 URL: http://bayespop.csss.washington.edu
 NeedsCompilation: yes
-Packaged: 2015-07-09 18:11:59 UTC; hana
+Packaged: 2015-12-04 22:29:47 UTC; hana
 Repository: CRAN
-Date/Publication: 2015-07-10 20:32:36
+Date/Publication: 2015-12-05 18:34:20
