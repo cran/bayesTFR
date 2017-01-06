@@ -1,5 +1,5 @@
-a54a1f79e209a31eba070596a5245c00 *ChangeLog
-4fb45a9e9a39338cfb3213bfe707f103 *DESCRIPTION
+ee28c5e4348423aaae1005897737634c *ChangeLog
+d4a799634d6d28a6ed1ca9b2076d3607 *DESCRIPTION
 6803d23be603daace5b214fe58fd681e *NAMESPACE
 d6a4763664ca409361e1364104200bb0 *R/diagnostics.R
 6acd3886f2fdb92b3fb925f6575c8c37 *R/get_outputs.R
@@ -9,8 +9,8 @@ c4b13f9f30526c16898a01c57b684399 *R/mcmc_ini.R
 3f5b27da7b594ea2d8913497e7ca7bd0 *R/mcmc_sampling.R
 c8bd487f12b837c831dfe0022c523029 *R/mcmc_storage.R
 2c72562e50d48b6c8897cc4b770afe65 *R/mcmc_update.R
-f772c3d9647e19ed88bc8d866ee9ee95 *R/plot_functions.R
-87cc34c61d5c739dffed847435319eaa *R/predict_tfr.R
+4d9a8b7dfdeaeb2faaf241726fe2e0ea *R/plot_functions.R
+c1fcadde81dbf6de9164b72ab58e341e *R/predict_tfr.R
 633d5b14d34a671456a3547180fe6ae5 *R/run_mcmc.R
 7553ac59e4150c2c29a6871462a4f249 *R/run_mcmc3.R
 3e0c19da1c98f0e49cbe45d179762a78 *R/wpp_data.R
@@ -1218,7 +1218,7 @@ d52e91ad26b416dd57d426bc85bdb5ec *inst/extdata/UN2010_last_obs.txt
 1020d812472c4f11d25f52f3f10e001e *man/UN_time.Rd
 fa6b38c7e40b611d514ab0a3c3d9c313 *man/UN_variants.Rd
 aa76d60b1ee1c24e6e6bde8f0604f2e9 *man/bayesTFR-internal.Rd
-042cf5fc0dad411e1fc7e4692c1fa905 *man/bayesTFR-package.Rd
+1ecb2b865ceeaea3d3f8fedfbeba1d22 *man/bayesTFR-package.Rd
 857c419667671fcb622e5f17455ae33a *man/bayesTFR.mcmc.Rd
 78f62cd87e3d1b491b7a793db71e6946 *man/bayesTFR.mcmc.meta.Rd
 5665825361aabfa056376c8a1fbe7702 *man/coda.mcmc.list.Rd
@@ -1238,7 +1238,7 @@ af23f75af5bd3a0a8a0bae5df475bf6e *man/include.Rd
 78a5bef25d18a546c9a47bb19e7a1384 *man/plot-pardensity.Rd
 af5e313f57ad68724241cc1835832b08 *man/plot-partraces.Rd
 f876d3fd343c36d2e74acfc28b274508 *man/plot-trajectories.Rd
-f321fd582e93dcafbceeb3916e6a25b3 *man/predict-tfr.Rd
+cbb3ed88aed374e987e4a45160558485 *man/predict-tfr.Rd
 d20e5372db886de4a6284821e9b6c2d2 *man/run-mcmc.Rd
 5b5cee1a45b7a6bcc3870b9401f01440 *man/run.tfr.mcmc.extra.Rd
 aec9ba33488d07dd296b37fed5301116 *man/run.tfr3.mcmc.Rd
