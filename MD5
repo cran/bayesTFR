@@ -1,8 +1,8 @@
-5efbacd8b38baefd2d44b03be3181174 *ChangeLog
-840d0586748c8ff7448d621bd6e48fe7 *DESCRIPTION
+22e7687a40b59a599be31ae6e9307b3c *ChangeLog
+735af0079edd25c984f2961b6b520b79 *DESCRIPTION
 5adac2407d29f79de4022f4696042c6c *LICENSE
 0015a0a2c2851ea1d35e35ba09a44351 *NAMESPACE
-947483a13ea43feafdc71827f593f63c *R/diagnostics.R
+13523442697427c9ad63734b3e4421b9 *R/diagnostics.R
 9dfd848203cef099b6013d49c9a1bd35 *R/get_outputs.R
 ce0cec7e7dd96c3cd8d289be5982b036 *R/mcmc3_sampling.R
 07e93d4bec4beb85da25ccd444cb0dff *R/mcmc_ini.R
@@ -10,7 +10,7 @@ ce0cec7e7dd96c3cd8d289be5982b036 *R/mcmc3_sampling.R
 a2e54018c339033d49a18ed226dd6fcd *R/mcmc_sampling.R
 ada8c2d509502e173e47e5f9e6f37142 *R/mcmc_storage.R
 6ea72776f69345651a7fae64ed719e0e *R/mcmc_update.R
-e4e694733ddbb2f1b7491cf2babe836f *R/plot_functions.R
+965c692042211c002df653a82ef9754e *R/plot_functions.R
 6b8ec432c3954c8898fc17f3d9d36de1 *R/predict_tfr.R
 d48b13c4fe4f426f29d80e2246a5c4e0 *R/predict_tfr_subnat.R
 0e5275886f96f38e114121f5956e3bba *R/run_mcmc.R
@@ -1105,7 +1105,7 @@ e85496419996546863d22140ee5947a6 *man/tfr.median.set.all.Rd
 415fde7ab2b9df3a601b4cf6aa04cc3c *man/tfr.parameter.names.Rd
 4eedab54f29aa1e747b886e78163706d *man/tfr.predict.extra.Rd
 ff70a2507cbae78291e1209b6d439da1 *man/tfr.predict.subnat.Rd
-1263075a29b73c3134f5f7774ea359f3 *man/tfr.raftery.diag.Rd
+04c51090214feecb586e5a0f1f53c151 *man/tfr.raftery.diag.Rd
 03146b2b11a9d0159a490aac0f76f0d9 *man/tfr_raw_data.Rd
 a0cf9a55d0c096c877aaa0f085861a75 *man/write.projection.summary.Rd
 880d73922544370dfe80071ba46cbf7e *src/bayesTFR_init.c
