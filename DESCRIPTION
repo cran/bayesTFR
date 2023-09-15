@@ -1,6 +1,6 @@
 Package: bayesTFR
-Version: 7.3-2
-Date: 2023-03-22
+Version: 7.4-0
+Date: 2023-09-14
 Title: Bayesian Fertility Projection
 Author: Hana Sevcikova (hanas@uw.edu), Leontine Alkema (alkema@nus.edu.sg), Peiran Liu (prliu@uw.edu), Adrian Raftery (raftery@uw.edu), Bailey Fosdick (bfosdick@uw.edu), Patrick Gerland (gerland@un.org)
 Maintainer: Hana Sevcikova <hanas@uw.edu>
@@ -14,6 +14,6 @@ License: GPL-3 | file LICENSE
 URL: https://bayespop.csss.washington.edu
 LazyData: false
 NeedsCompilation: yes
-Packaged: 2023-03-23 04:24:12 UTC; hana
+Packaged: 2023-09-14 23:48:55 UTC; hana
 Repository: CRAN
-Date/Publication: 2023-03-23 07:50:02 UTC
+Date/Publication: 2023-09-15 08:12:05 UTC
