@@ -1,5 +1,5 @@
-b34df433d7d42cd55cf8fcbd6fa19552 *ChangeLog
-f1b9d9bf74b0ec254c0fb8bb9959aa2d *DESCRIPTION
+02f2cffc4847a94148b9f4c02396a879 *ChangeLog
+a02ec3ee1cc339a30ae81ab1cf6bc433 *DESCRIPTION
 5adac2407d29f79de4022f4696042c6c *LICENSE
 8ba41cbc620f534cc37b3a8b6ef1dcc6 *NAMESPACE
 a8a142d0e03bbda4e76d7a61b5e80a10 *R/diagnostics.R
@@ -10,7 +10,7 @@ ce0cec7e7dd96c3cd8d289be5982b036 *R/mcmc3_sampling.R
 4733422fb8ef9599054408318dc4a314 *R/mcmc_sampling.R
 244575f730dfd0fa08695e8fc52fd127 *R/mcmc_storage.R
 12eb555ebc5e09f0c186122b239d3149 *R/mcmc_update.R
-ee37cf222c69ea4be6ea0be01fa3b1d6 *R/plot_functions.R
+bd0442e0fe6ec8626a6296f5bbd575aa *R/plot_functions.R
 263303988a35bf4167c9ffc83f24e295 *R/predict_tfr.R
 43baf9d19e8cac1fb477e92ad14a1939 *R/predict_tfr_subnat.R
 0e1fe80a5cc33383c30bf53c51625daa *R/run_mcmc.R
@@ -1066,7 +1066,7 @@ b32ab60edb152f99d0de9bf53f18d5c6 *man/bayesTFR-package.Rd
 394060814070ec973ea41a2ae5464eae *man/bayesTFR.mcmc.Rd
 641d79e0063cca9185025ee84ee11798 *man/bayesTFR.mcmc.meta.Rd
 5665825361aabfa056376c8a1fbe7702 *man/coda.mcmc.list.Rd
-049b4005b577162c4f5b3824fddbcec3 *man/convert.trajectories.Rd
+959db5ba0ed70e7f3400462e80b157ed *man/convert.trajectories.Rd
 b57248bdddf9b9316556037401eaeb64 *man/country.names.Rd
 1900f14988ad41132d3c418738bd0692 *man/get.country.object.Rd
 39965dbe54c93f590972e858f8b0c72a *man/get.est.model.Rd
@@ -1102,7 +1102,7 @@ dc27904b0d01c66d71236215724a0632 *man/summary-mcmc.Rd
 6634ce4f16830d3b14bf46e9cff2f38e *man/tfr.predict.subnat.Rd
 04c51090214feecb586e5a0f1f53c151 *man/tfr.raftery.diag.Rd
 03146b2b11a9d0159a490aac0f76f0d9 *man/tfr_raw_data.Rd
-bff6775b26ab4efa39384d90c5a40426 *man/write.projection.summary.Rd
+e99cbff3b8a1edf8d4abbe43d35e234e *man/write.projection.summary.Rd
 880d73922544370dfe80071ba46cbf7e *src/bayesTFR_init.c
 a08850ca88870e2486050c95cd389e77 *src/mcmc_likelihood.c
 55870a08122f799890200d352edfe93e *tests/run_tests.R
