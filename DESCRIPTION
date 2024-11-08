@@ -1,9 +1,30 @@
 Package: bayesTFR
-Version: 7.4-2
-Date: 2023-10-17
+Version: 7.4-4
+Date: 2024-11-01
 Title: Bayesian Fertility Projection
-Author: Hana Sevcikova (hanas@uw.edu), Leontine Alkema (alkema@nus.edu.sg), Peiran Liu (prliu@uw.edu), Adrian Raftery (raftery@uw.edu), Bailey Fosdick (bfosdick@uw.edu), Patrick Gerland (gerland@un.org)
-Maintainer: Hana Sevcikova <hanas@uw.edu>
+Authors@R: c(person(given = "Hana",
+                    family = "Sevcikova",
+                    role = c("cre", "aut"),
+                    email = "hanas@uw.edu"),
+            person(given = "Leontine",
+                      family = "Alkema",
+                      role = "aut"),
+            person(given = "Peiran",
+                      family = "Liu",
+                      role = "aut"),
+             person(given = "Adrian",
+                      family = "Raftery",
+                      role = "aut",
+                      email = "raftery@uw.edu"),
+            person(given = "Bailey",
+                      family = "Fosdick",
+                      role = "aut"),
+            person(given = "Patrick",
+                      family = "Gerland",
+                      role = "aut",
+                      email = "gerland@un.org"
+                      )
+           )
 Depends: R (>= 3.5.0)
 Imports: mvtnorm, MASS, coda, graphics, grDevices, stats, utils,
         wpp2019, data.table, lifecycle
@@ -14,6 +35,13 @@ License: GPL-3 | file LICENSE
 URL: https://bayespop.csss.washington.edu
 LazyData: false
 NeedsCompilation: yes
-Packaged: 2023-10-18 03:59:35 UTC; hana
+Packaged: 2024-11-07 21:18:59 UTC; hana
+Author: Hana Sevcikova [cre, aut],
+  Leontine Alkema [aut],
+  Peiran Liu [aut],
+  Adrian Raftery [aut],
+  Bailey Fosdick [aut],
+  Patrick Gerland [aut]
+Maintainer: Hana Sevcikova <hanas@uw.edu>
 Repository: CRAN
-Date/Publication: 2023-10-18 10:40:07 UTC
+Date/Publication: 2024-11-08 09:20:05 UTC
